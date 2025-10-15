@@ -1,0 +1,11 @@
+syntax = "proto2";
+package control;
+
+import "common_msgs/basic_msgs/header.proto";
+
+message InputDebug {
+  optional control.common.Header localization_header = 1;
+  optional control.common.Header canbus_header = 2;
+  optional control.common.Header trajectory_header = 3;
+  optional control.common.Header latest_replan_trajectory_header = 4;
+}

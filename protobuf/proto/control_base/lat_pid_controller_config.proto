@@ -1,0 +1,191 @@
+syntax = "proto2";
+
+package control;
+
+message PiffParameters{
+    required float curvature = 1;
+    required float speed_kph = 2;
+    repeated float matrix_k = 3;
+}
+
+message PiffMeanFilterSwitch{
+    required bool enable_center_line_c0 = 1;
+    required bool enable_center_line_c1 = 2;
+    required bool enable_center_line_c2 = 3;
+    required bool enable_speed_mps = 4;
+    required bool enable_yaw_rate = 5;
+}
+
+message PiffMeanFilterWindowSize {
+    required int32 center_line_c0_mfws = 1;
+    required int32 center_line_c1_mfws = 2;
+    required int32 center_line_c2_mfws = 3;
+    required int32 speed_mps_mfws = 4;
+    required int32 yaw_rate_mfws = 5;
+}
+
+message PiffMeanFilterConfig{
+    required PiffMeanFilterSwitch filter_switch = 1;
+    required PiffMeanFilterWindowSize window_size = 2;
+}
+
+message PiffControllerContentRateConfig{
+    required float curvature = 1;
+    required float speed_kph = 2;
+    required float ff_rate = 3;
+    required float fb_rate = 4;
+}
+
+message PiffLinearModeIntegratorConfig{
+    required int32 ki_mode = 1;
+    repeated float ki = 2;
+}
+
+message PiffPercentageModeIntegratorConfig{
+    required float track_percentage = 1;
+    required bool enable_lateral_err_contribution = 2;
+    required bool enable_lateral_err_rate_contribution = 3;
+    required bool enable_heading_err_contribution = 4;
+    required bool enable_heading_err_rate_contribution = 5;
+}
+
+message PiffProtectIntegratorConfig{
+    required bool flag_protection = 1;
+    required int32 frames_protection = 2;
+}
+
+message PiffIntegratorConfig{
+    required bool enable_integrator = 1;
+    required float steering_saturation_level_deg = 2;
+    required int32 mode_integrator = 3;
+    required PiffLinearModeIntegratorConfig linear_mode_integrator_conf = 4;
+    required PiffPercentageModeIntegratorConfig percentage_mode_integrator_conf = 5;
+    required PiffProtectIntegratorConfig protect_integrator_conf = 6;
+}
+
+message PiffCCSteeringFakeDeadZoneConfig{
+    required bool enable_fake_dead_zone = 1;
+    required float lateral_error_m_fake_zone = 2;
+    required float heading_error_rad_fake_zone = 3;
+    required bool enable_fake_transition_zone = 4;
+    required float lateral_error_m_transition_zone = 5;
+    required float heading_error_rad_transition_zone = 6;  
+    required int32 mode = 7;  
+}
+
+message PiffControllerContentConfig{
+    required int32 preview_mode = 1;
+    required float preview_time_ms_c01 = 2;
+    required float preview_time_ms_c2 = 3;
+    required float curvature_min_start_ff = 4;
+    repeated PiffControllerContentRateConfig rate_conf = 5;
+    required PiffIntegratorConfig integrator_conf = 6;
+    required float steering_bias_deg = 7;
+    required PiffCCSteeringFakeDeadZoneConfig steering_fake_dead_zone_conf = 8;
+    required float curvaturn_transition_ff = 9;
+}
+
+message PiffTrackingDifferentiatorSwitch {
+    required bool enable_center_line_c2 = 1;
+    required bool enable_yaw_rate = 2;
+}
+
+message PiffTrackingDifferentiatorStateParameters{
+    required float tracking_rate = 1;
+    required int32 smooth_frame = 2;
+}
+
+message PiffTrackingDifferentiatorConfig{
+    required PiffTrackingDifferentiatorSwitch td_switch = 1;
+    required PiffTrackingDifferentiatorStateParameters center_line_c2_paras = 2;
+    required PiffTrackingDifferentiatorStateParameters yaw_rate_paras = 3;
+}
+
+message PiffDTInputMaxLimitConfig{
+    required float speed_kph = 1;
+    required float lateral_error = 2;
+    required float heading_error_deg = 3;
+}
+
+message PiffDTInputFrameLimitConfig{
+    required float speed_kph = 1;
+    required float c0_jump_max_m = 2;
+    required float c0_transit_rate_mps = 3;
+    required float c0_track_percentage = 4;
+    required float c1_jump_max_rad = 5;
+    required float c1_transit_rate_radps = 6;
+    required float c1_track_percentage = 7;
+    required float c2_jump_max = 8;
+    required float c2_transit_rate = 9;
+    required float c2_track_percentage = 10;
+}
+
+message PiffDataTransformConfig{
+    required bool enable_input_max_limit = 1;
+    repeated PiffDTInputMaxLimitConfig input_max_limit_conf = 2;
+    required bool enable_input_frame_limit = 3;
+    repeated PiffDTInputFrameLimitConfig input_frame_limit_conf = 4;
+    required int32 frame_ramp_mode = 5;
+}
+
+message PiffPPSteeringAngleLimit{
+    required float speed_kph = 1;
+    required float steering_range_deg = 2;
+    required float steering_rate_range_degps = 3;
+}
+
+message PiffPPActivateControlContentConfig{
+    required float speed_kph = 1;
+    required float steering_rate_degps = 2;
+    required float steering_dead_zone_deg = 3;
+    required float steering_frame_track_percentage = 4;
+}
+
+message PiffPPDectivateControlContentConfig{
+    required float speed_kph = 1;
+    required float steering_rate_degps = 2;
+    required float steering_frame_track_percentage = 3;
+}
+
+message PiffPPActivateControlConfig{
+    required bool enable_post_activate_control = 1;
+    repeated PiffPPActivateControlContentConfig activate_conf = 2;
+    required int32 ramp_mode = 3;
+}
+
+message PiffPPDeactivateControlConfig{
+    required bool enable_post_deactivate_control = 1;
+    repeated PiffPPDectivateControlContentConfig deactivate_conf = 2;
+    required int32 ramp_mode = 3;
+}
+
+message PiffPostProcessConfig{
+    required bool enable_steering_limit = 1;
+    required float steering_range_factor = 2;
+    required float steering_rate_range_factor = 3;
+    repeated PiffPPSteeringAngleLimit steering_angle_limit = 4;
+    required PiffPPActivateControlConfig post_activate_control_conf = 5;
+    required PiffPPDeactivateControlConfig post_deactivate_control_conf = 6;
+}
+
+message PiffCoeffientGainConfig{
+    required float c0_threshold = 1;
+    required float c1_coef = 2;
+    required float c2_coef = 3;
+}
+
+message PiffCommonParametersConfig{
+    required float control_period = 1;
+    required float standstill_speed_mps = 3;
+}
+
+message LatPidConfig {
+    required PiffCommonParametersConfig common_para_conf = 1;
+    required PiffControllerContentConfig controller_content_conf = 2;
+    repeated PiffParameters piff_paras = 3;
+    required PiffMeanFilterConfig mean_filter_conf = 4;
+    required PiffTrackingDifferentiatorConfig tracking_differentiator_conf = 5;
+    required PiffDataTransformConfig data_transform_conf = 6;
+    required PiffPostProcessConfig post_process_conf = 7;
+    required PiffCoeffientGainConfig coeffient_gain_conf = 8;
+}

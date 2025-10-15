@@ -1,0 +1,10 @@
+syntax = "proto2";
+
+import "control_base/plugin_declare_info.proto";
+
+package control;
+
+message ControlPipeline {
+    // The contained controller list of the controller pipeline.
+    repeated PluginDeclareInfo controller = 1;
+}

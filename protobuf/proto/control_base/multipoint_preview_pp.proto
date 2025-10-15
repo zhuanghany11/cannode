@@ -1,0 +1,57 @@
+syntax = "proto2";
+
+package control;
+
+message PIDParameters {
+  optional bool  enable_pid = 1 [default = true];
+  optional float kp = 2 [default = 1.0];
+  optional float ki = 3 [default = 2.0];
+  optional float kd = 4 [default = 0.6];
+  optional float kp_coef_full_laod = 5 [default = 1.0];
+  optional float smaller_kd = 6 [default = 0.2];
+  optional bool  enable_adjust_kp = 7 [default = false];
+  optional float kp_coef = 8 [default = 1.05];
+  optional float max_kp_threshold = 9 [default = 0.02];
+  optional float larger_kp_threshold = 10 [default = 0.06];
+}
+
+message IntegrationParameters {
+  optional bool  enable_integration = 1 [default = false];
+  optional float forgetting_factor = 2 [default = 0.98];
+  optional float integrator_saturation_threshold = 3 [default = 5.0];
+  optional float speed_threshold = 4 [default = 0.5]; //unit: m/s
+  optional float lat_error_threshold = 5 [default = 2]; //unit: m
+  optional float ki = 6 [default = 1.0];
+  optional float reversse_ki = 7 [default = 2.0];
+  optional float kappa_threshold = 8 [default = 0.01];
+}
+
+
+message MultipointPreviewPPConfig {
+  optional float base_preview_dis = 1 [default = 5.0];  //unit: meter
+  optional float base_preview_time = 2 [default = 2.0]; //unit: second
+  repeated float preview_time_coef = 3; // 0.8 1.0 1.25
+  optional PIDParameters pid_params = 4;
+  repeated double preview_point_weight = 5; // 0.2 0.5 0.3
+  optional double kappa_threshold = 6 [default = 0.02];
+
+  // when the curvature is larger than kappa_threshold, the preview time will be reduced
+  // reduced_preview_time = kappa_time_coef * curvature * base_preview_time
+  optional float kappa_time_coef = 7 [default = 10]; 
+  // adjust the preview distance according to the lateral error
+  optional bool   enable_predis_compensation_baseon_lat_err = 8 [default = false];
+  optional double coef_with_lat_error = 9 [default = 1.8];
+  optional double dis_compensation_threshold_with_lat_error = 10 [default = 1.5];
+  
+  // indicate whether query the nearest point
+  optional bool query_time_nearest_point_only = 11 [default = false];
+  optional double query_relative_time = 12 [default = 0.8];
+  
+  // mean filter for lateral error
+  optional bool enable_lat_error_filter = 13 [default = false];
+  optional bool enable_heading_error_filter = 14 [default = false];
+  optional int32 mean_filter_window_size = 15 [default = 5];  // window size of mean filter
+  
+  // integration parameters for the lateral error control
+  optional IntegrationParameters integration_params = 16;
+}

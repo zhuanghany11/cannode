@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package control.localization;
+
+import "common_msgs/basic_msgs/header.proto";
+import "localization_msgs/pose.proto";
+
+message CorrectedImu {
+  optional control.common.Header header = 1;
+
+  // Inertial Measurement Unit(IMU)
+  optional control.localization.Pose imu = 3;
+}

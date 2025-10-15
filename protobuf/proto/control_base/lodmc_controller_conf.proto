@@ -1,0 +1,32 @@
+syntax = "proto2";
+
+import "control_base/pid_conf.proto";
+import "control_base/gain_scheduler_conf.proto";
+
+package control.lodmcctrl;
+
+message LoDmcControllerConf {
+    optional double g_acc = 1; //重力加速度
+    optional double f_coef = 2; //滚动阻力系数
+    optional double mass = 3; //车辆质量
+    optional double cd = 4; //风阻系数
+    optional double area = 5; //迎风面积
+    optional double roll = 6;//空气密度
+    optional PidConf lodmc_pid_conf = 7;
+    optional double f2t_coef = 8;
+    optional double ts = 9;
+    optional control.GainScheduler slope_dmc_f_gain_scheduler = 10;
+    optional control.GainScheduler roll_dmc_f_gain_scheduler = 11;
+    optional control.GainScheduler kp_dmc_gain_scheduler = 12;
+    optional control.GainScheduler fb_dmc_gain_scheduler = 13;
+    optional control.GainScheduler dmc_f_roll_gain_scheduler = 14;
+    optional control.GainScheduler dmc_f_air_gain_scheduler = 15;
+    optional control.GainScheduler dmc_f_acc_gain_scheduler = 16;
+    optional double lodmc_torq_limit_up = 17;
+    optional double lodmc_torq_limit_low = 18;
+    optional double control_freq = 19;
+    optional double acc_err_lowpassfilter_cutoff_freq = 20;
+    optional control.GainScheduler slope_dmc_f_acc_gain_scheduler = 21;
+    optional control.GainScheduler slope_dmc_f_decel_mass_gain_scheduler = 22;
+    optional double target_acc_lowpassfilter_cutoff_freq = 23;
+}

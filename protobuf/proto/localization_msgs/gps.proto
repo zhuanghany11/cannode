@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package control.localization;
+
+import "common_msgs/basic_msgs/header.proto";
+import "localization_msgs/pose.proto";
+
+message Gps {
+  optional control.common.Header header = 1;
+
+  // Localization message: from GPS or localization
+  optional control.localization.Pose localization = 2;
+}

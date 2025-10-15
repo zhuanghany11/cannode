@@ -1,0 +1,17 @@
+syntax = "proto2";
+
+package control;
+
+import "common_msgs/chassis_msgs/chassis.proto";
+import "common_msgs/basic_msgs/header.proto";
+import "control_msgs/pad_msg.proto";
+import "localization_msgs/localization.proto";
+import "planning_msgs/planning.proto";
+
+message LocalView {
+  optional control.common.Header header = 1;
+  optional control.canbus.Chassis chassis = 2;
+  optional control.planning.ADCTrajectory trajectory = 3;
+  optional control.localization.LocalizationEstimate localization = 4;
+  optional PadMessage pad_msg = 5;
+}

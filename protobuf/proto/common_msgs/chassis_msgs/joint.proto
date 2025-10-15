@@ -1,0 +1,24 @@
+syntax = "proto2";
+
+package control.canbus;
+
+// import "common_msgs/basic_msgs/vehicle_id.proto";
+// import "common_msgs/chassis_msgs/chassis.proto";
+
+// message JointMsg {
+//   optional double shovel_angle = 1 [default = 0.0];
+//   optional double arm_angle = 2  [default = 0.0];
+//   optional double start_position = 3 [default = 0.0];
+//   optional double end_position = 4 [default = 0.0];
+//   optional double speed = 5 [default = 0.0];
+//   optional string description = 6;
+// }
+
+message JointAngle {
+  optional double shovel_angle = 1[default = 0.0];
+  optional double arm_angle = 2[default = 0.0];
+}
+
+// message ChassisActions {
+//   repeated JointMsg joint_cmd = 1;
+// }

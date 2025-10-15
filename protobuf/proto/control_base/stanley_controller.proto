@@ -1,0 +1,18 @@
+syntax = "proto2";
+
+package control;
+message StanleyControllerConfig {
+
+  // mean filter for lateral error amdd heading error
+  optional bool enable_lat_error_filter = 1 [default = false];
+  optional bool enable_heading_error_filter = 2 [default = false];
+  optional int32 mean_filter_window_size = 3 [default = 5];  // window size of mean filter
+
+  // indicate whether query the nearest point
+  optional bool query_time_nearest_point_only = 4 [default = false];
+  optional double query_relative_time = 5 [default = 0.8];
+
+  optional float k_y = 6 [default = 0.3];
+  optional float base_preview_dis = 7 [default = 3]; // unit: m
+  optional float base_preview_time = 8 [default = 2.0]; // unit: s
+}

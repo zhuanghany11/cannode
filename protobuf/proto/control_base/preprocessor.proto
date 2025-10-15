@@ -1,0 +1,18 @@
+syntax = "proto2";
+
+package control;
+
+import "common_msgs/basic_msgs/header.proto";
+import "common_msgs/basic_msgs/drive_state.proto";
+import "control_msgs/input_debug.proto";
+import "control_base/local_view.proto";
+
+message Preprocessor {
+  optional control.common.Header header = 1;
+  optional LocalView local_view = 2;
+  optional control.common.EngageAdvice engage_advice = 4;
+  optional InputDebug input_debug = 5;
+  optional bool received_pad_msg = 6 [default = false];
+  optional bool estop = 7 [default = false];
+  optional string estop_reason = 8;
+}
