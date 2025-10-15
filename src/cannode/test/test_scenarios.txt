@@ -1,0 +1,121 @@
+# 测试场景配置示例
+# 将以下配置复制到 send_control_cmd.py 的 TEST_CONFIG 中
+
+# ========================================
+# 场景1：静止状态 - 所有控制为0
+# ========================================
+TEST_CONFIG = {
+    'target_speed': 0.0,
+    'target_arm_angle': 0.0,
+    'target_shovel_angle': 0.0,
+    'target_steering': 0.0,
+    'parking_brake': True,
+    'emergency_stop': False,
+    'throttle': 0.0,
+    'brake': 0.0,
+    'arm_enable': False,
+    'shovel_enable': False,
+    'publish_rate': 10.0,
+}
+
+# ========================================
+# 场景2：低速前进测试
+# ========================================
+TEST_CONFIG = {
+    'target_speed': 1.0,        # 1m/s慢速
+    'target_arm_angle': 0.0,
+    'target_shovel_angle': 0.0,
+    'target_steering': 0.0,
+    'parking_brake': False,
+    'emergency_stop': False,
+    'throttle': 30.0,
+    'brake': 0.0,
+    'arm_enable': False,
+    'shovel_enable': False,
+    'publish_rate': 10.0,
+}
+
+# ========================================
+# 场景3：大臂抬升测试
+# ========================================
+TEST_CONFIG = {
+    'target_speed': 0.0,
+    'target_arm_angle': 45.0,   # 抬升到45度
+    'target_shovel_angle': 0.0,
+    'target_steering': 0.0,
+    'parking_brake': True,
+    'emergency_stop': False,
+    'throttle': 0.0,
+    'brake': 0.0,
+    'arm_enable': True,
+    'shovel_enable': False,
+    'publish_rate': 10.0,
+}
+
+# ========================================
+# 场景4：铲斗收放测试
+# ========================================
+TEST_CONFIG = {
+    'target_speed': 0.0,
+    'target_arm_angle': 0.0,
+    'target_shovel_angle': 30.0,  # 铲斗30度
+    'target_steering': 0.0,
+    'parking_brake': True,
+    'emergency_stop': False,
+    'throttle': 0.0,
+    'brake': 0.0,
+    'arm_enable': False,
+    'shovel_enable': True,
+    'publish_rate': 10.0,
+}
+
+# ========================================
+# 场景5：转向测试
+# ========================================
+TEST_CONFIG = {
+    'target_speed': 0.5,         # 极慢速度下转向
+    'target_arm_angle': 0.0,
+    'target_shovel_angle': 0.0,
+    'target_steering': 25.0,     # 右转25%
+    'parking_brake': False,
+    'emergency_stop': False,
+    'throttle': 20.0,
+    'brake': 0.0,
+    'arm_enable': False,
+    'shovel_enable': False,
+    'publish_rate': 10.0,
+}
+
+# ========================================
+# 场景6：综合作业测试
+# ========================================
+TEST_CONFIG = {
+    'target_speed': 1.5,
+    'target_arm_angle': 35.0,
+    'target_shovel_angle': 25.0,
+    'target_steering': 10.0,
+    'parking_brake': False,
+    'emergency_stop': False,
+    'throttle': 40.0,
+    'brake': 0.0,
+    'arm_enable': True,
+    'shovel_enable': True,
+    'publish_rate': 10.0,
+}
+
+# ========================================
+# 场景7：急停测试
+# ========================================
+TEST_CONFIG = {
+    'target_speed': 0.0,
+    'target_arm_angle': 0.0,
+    'target_shovel_angle': 0.0,
+    'target_steering': 0.0,
+    'parking_brake': True,
+    'emergency_stop': True,      # 急停激活
+    'throttle': 0.0,
+    'brake': 100.0,
+    'arm_enable': False,
+    'shovel_enable': False,
+    'publish_rate': 10.0,
+}

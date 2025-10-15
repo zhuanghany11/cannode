@@ -22,14 +22,6 @@ add_compile_definitions(GLOG_USE_GLOG_EXPORT)
 set(CMAKE_PREFIX_PATH "/opt/ros/humble" ${CMAKE_PREFIX_PATH})
 link_directories(/opt/ros/humble/lib /opt/ros/humble/lib64)
 
-file(GLOB_RECURSE
-  SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp 
-  ${CMAKE_CURRENT_SOURCE_DIR}/*.cc
-)
-
-add_executable(${MODULE_NAME} ${SOURCES})
-
 # find package
 find_package(Threads REQUIRED)
 find_package(ament_cmake REQUIRED)
@@ -69,11 +61,31 @@ foreach(proto_file ${MSG_PROTOS})
   )
 endforeach()
 
+# Collect all generated protobuf source files
+file(GLOB_RECURSE PROTO_SRCS "${proto_dir}/out/*.pb.cc")
+
+# Main cannode executable
+file(GLOB_RECURSE
+  SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/main.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp 
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc
+)
+
+add_executable(${MODULE_NAME} ${SOURCES} ${PROTO_SRCS})
+
+# Test node: send_control_cmd
+add_executable(send_control_cmd 
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/send_control_cmd.cc
+  ${PROTO_SRCS}
+)
+
 # include_sub_directories_recursively(${root_dir})
 
 
 # set compile option
 target_compile_options(${MODULE_NAME} PRIVATE -Wall)
+target_compile_options(send_control_cmd PRIVATE -Wall)
 
 ament_target_dependencies(${MODULE_NAME}
   PUBLIC
@@ -83,6 +95,13 @@ ament_target_dependencies(${MODULE_NAME}
   # sensor_msgs
 )
 
+ament_target_dependencies(send_control_cmd
+  PUBLIC
+  rclcpp
+  std_msgs
+  sa_msgs
+)
+
 target_include_directories(${MODULE_NAME}
   PRIVATE
   ${OSAL_INC_DIR}
@@ -90,6 +109,11 @@ target_include_directories(${MODULE_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
   ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/out
   ${CMAKE_CURRENT_SOURCE_DIR}/src/low_level_controller
+)
+
+target_include_directories(send_control_cmd
+  PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/out
 )
 
 set(ABSEL_LIBARARY
@@ -140,8 +164,18 @@ target_link_libraries(
   ${ABSEL_LIBARARY}
 )
 
+# link lib for test node
+target_link_libraries(
+  send_control_cmd
+  PRIVATE
+  Threads::Threads
+  ${PROTOBUF_LIBRARIES}
+  ${ABSEL_LIBARARY}
+)
+
 install(TARGETS
   ${MODULE_NAME}
+  send_control_cmd
   DESTINATION lib/${PROJECT_NAME}
 )
 

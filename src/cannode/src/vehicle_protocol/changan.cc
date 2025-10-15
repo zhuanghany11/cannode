@@ -17,7 +17,7 @@ ChanganCANParser::ChanganCANParser(std::string canPort)
     
     checkDataStructure();
     initPIDControllers();
-    initFuncMap();
+  initFuncMap();
 }
 
 void ChanganCANParser::initFuncMap() {

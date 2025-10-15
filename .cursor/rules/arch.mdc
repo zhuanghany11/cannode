@@ -26,4 +26,8 @@ doc/changan_protocol.dbc是长安车辆的dbc文件，也是我们需要使用�
 4. 最后将加速度、大臂液压阀开度、铲斗液压阀开度、转向液压阀开度和方向的数据，按照changan_protocol.dbc的形式发送出去。对于CAN总线数据的处理方式，可以参考python代码doc/changan/changan/joystick-to-can-tool/can_message_parser/data_assignment.py
 
 
+
+其中test中需要有一个测试程序：一个C++节点来发送测试，在test文件夹中的send_control_cmd.cc的代码，可以在代码中进行修改我要发送的Protobuf的控制指令，通过给定输入的数据，比如-speed 0.1 之类。通过ROS2的argument将需要动态调整的参数输入进入。通过ros2 launch cannode send_control_cmd.launch.py的方式直接启动脚本或通过launch中argument修改目标参数，该程序可用于发送固定的大臂目标角度、目标速度等功能。用于和当前的cannode形成闭环测试使用。
+
+
 代码不需要编译，修改结束后任务就停止。
