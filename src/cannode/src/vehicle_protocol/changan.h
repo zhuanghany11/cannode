@@ -1,25 +1,29 @@
-/*
 #pragma once
 
 #include <cstdint>
-#include <array>
-#include <optional>
-#include <stdint.h>
+#include <linux/can.h>
+#include "../chassis_driver.h"
+#include "../low_level_controller/acc_to_speed_controller.h"
+#include "../low_level_controller/valve_to_angle_controller.h"
 
-#define CA_CAN_DLEN 8
+namespace cannode {
 
-enum CanProtoId {
-    CCU_CMD_1 = 0x18000001, // 上位机→VCU 控制命令1
-    CCU_CMD_2 = 0x18000002, // 上位机→VCU 控制命令2
-    CCU_CMD_3 = 0x18000003, // 上位机→VCU 控制命令3
-    CCU_CMD_4 = 0x18000004, // 上位机→VCU 控制命令4
-    VCU_INFO_1 = 0x181F0001, // VCU→上位机 信息1
-    VCU_INFO_2 = 0x181F0002, // VCU→上位机 信息2
-    VCU_INFO_3 = 0x181F0003, // VCU→上位机 信息3
-    VCU_INFO_4 = 0x181F0004, // VCU→上位机 信息4
-    VCU_INFO_5 = 0x181F0005, // VCU→上位机 信息5
-    VCU_INFO_6 = 0x181F0006, // VCU→上位机 信息6
-    VCU_INFO_7 = 0x181F0007  // VCU→上位机 信息7
+// CAN消息ID定义（DBC中的ID需要减去0x80000000）
+enum ChanganCanProtoId {
+    // 上位机→VCU 控制命令
+    CA_CHASSIS_CTRL     = 0x18000001,  // 控制命令消息
+    CA_HYDRAULIC_CTRL   = 0x18000002,  // 液压电机控制消息
+    CA_WALKING_CTRL     = 0x18000003,  // 行走电机控制消息
+    CA_ACTUATOR_CTRL    = 0x18000004,  // 机构电磁阀控制消息
+    
+    // VCU→上位机 状态反馈
+    CA_STATUS_FB_01     = 0x181F0001,  // 状态反馈消息1
+    CA_MOTOR_STATUS_02  = 0x181F0002,  // 电机状态消息2
+    CA_WALKING_STATUS   = 0x181F0003,  // 行走电机状态
+    CA_POWER_INFO       = 0x181F0004,  // 功率信息
+    CA_VALVE_CURRENT_FB = 0x181F0005,  // 阀电流反馈
+    CA_JOINT_PRESSURE   = 0x181F0006,  // 关节油压
+    CA_DANFOSS_STEERING = 0x181F0007   // 丹佛斯转向
 };
 
 #pragma pack(push, 1)
@@ -28,280 +32,266 @@ enum CanProtoId {
 // 上位机→VCU 控制命令定义
 // ================================
 
-// 上位机→VCU 控制命令1 (0x18000001)
-typedef struct CanCtrlCmd1 {
-    // byte0
-    uint8_t high_voltage : 1;      // 整车上高压
-    uint8_t reserved1 : 1;         // 预留
-    uint8_t soft_estop : 1;        // 软急停
-    uint8_t left_turn : 1;         // 左转灯
-    uint8_t right_turn : 1;        // 右转灯
-    uint8_t reserved2 : 2;         // 预留
-    uint8_t vehicle_mode : 1;      // 整车模式
+// 控制命令消息 (0x18000001)
+typedef struct ChanganChassisControl {
+    // byte 0
+    uint8_t high_voltage_enable : 1;      // bit 0: 整车上高压
+    uint8_t reserved1 : 1;                // bit 1: 预留
+    uint8_t soft_estop : 1;               // bit 2: 软急停
+    uint8_t left_turn_light : 1;          // bit 3: 左转灯
+    uint8_t right_turn_light : 1;         // bit 4: 右转灯
+    uint8_t reserved2 : 2;                // bit 5-6: 预留
+    uint8_t vehicle_mode : 1;             // bit 7: 整车模式
     
-    // byte1
-    uint8_t reserved3 : 1;          // 预留
-    uint8_t heartbeat : 1;         // 心跳信号
-    uint8_t speed_gear : 1;        // 速度挡位切换
-    uint8_t work_light : 1;        // 工作大灯
-    uint8_t clear_steer_error : 1; // 清除转向阀错误
-    uint8_t high_beam : 1;         // 远光灯
-    uint8_t low_beam : 1;          // 近光灯
-    uint8_t horn : 1;              // 喇叭
+    // byte 1
+    uint8_t reserved3 : 1;                // bit 8: 预留
+    uint8_t heartbeat : 1;                // bit 9: 心跳信号
+    uint8_t speed_gear : 1;               // bit 10: 速度挡位
+    uint8_t work_light : 1;               // bit 11: 工作大灯
+    uint8_t clear_steer_error : 1;        // bit 12: 清除转向阀错误
+    uint8_t high_beam : 1;                // bit 13: 远光灯
+    uint8_t low_beam : 1;                 // bit 14: 近光灯
+    uint8_t horn : 1;                     // bit 15: 喇叭
     
-    // byte2
-    uint8_t alarm_lights : 5;      // 声光报警器
-    uint8_t clear_error : 1;       // 清错
-    uint8_t reserved4 : 2;         // 预留
+    // byte 2
+    uint8_t alarm_lights : 5;             // bit 16-20: 声光报警器
+    uint8_t clear_error : 1;              // bit 21: 清错
+    uint8_t reserved4 : 2;                // bit 22-23: 预留
     
-    // byte3 - byte7 (40位预留)
-    uint8_t reserved5[5];          // 40位预留空间
-}CA0x18000001Struct;
+    // byte 3-7 (40位预留)
+    uint8_t reserved5[5];                 // 预留
+} CA_ChassisCtrl;
 
-// 上位机→VCU 控制命令2 (0x18000002)
-typedef struct CanCtrlCmd2 {
-    // byte0
-    uint8_t hyd_motor_en : 1;      // 液压电机使能
-    uint8_t hyd_work_mode : 2;     // 液压电机工作模式
-    uint8_t hyd_econ_mode : 2;     // 液压电机经济模式
-    uint8_t steer_valve_dir : 2;   // 转向电磁阀方向
-    uint8_t reserved1 : 1;         // 预留
+// 液压电机控制消息 (0x18000002)
+typedef struct ChanganHydraulicControl {
+    // byte 0
+    uint8_t hyd_motor_enable : 1;         // bit 0: 液压电机使能
+    uint8_t hyd_work_mode : 2;            // bit 1-2: 工作模式
+    uint8_t hyd_econ_mode : 2;            // bit 3-4: 经济模式
+    uint8_t steer_valve_dir : 2;          // bit 5-6: 转向电磁阀方向
+    uint8_t reserved1 : 1;                // bit 7: 预留
     
-    // byte1 - byte2 (16位液压电机请求扭矩)
-    uint16_t hyd_req_torque;       // 液压电机请求扭矩
+    // byte 1-2 (16位液压电机请求扭矩)
+    uint16_t hyd_req_torque;              // 液压电机请求扭矩
     
-    // byte3 - byte4 (16位液压电机请求转速)
-    uint16_t hyd_req_speed;        // 液压电机请求转速
+    // byte 3-4 (16位液压电机请求转速)
+    uint16_t hyd_req_speed;               // 液压电机请求转速
     
-    // byte5 - byte6 (16位转向电磁阀电流)
-    uint16_t steer_valve_current; // 转向电磁阀电流
+    // byte 5-6 (16位转向电磁阀电流)
+    uint16_t steer_valve_current;         // 转向电磁阀电流 (0-1500mA)
     
-    // byte7 (8位预留)
-    uint8_t reserved2;             // 预留
-}CA0x18000002Struct;
+    // byte 7
+    uint8_t reserved2;                    // 预留
+} CA_HydraulicCtrl;
 
-// 上位机→VCU 控制命令3 (0x18000003)
-typedef struct CanCtrlCmd3 {
-    // byte0
-    uint8_t drive_motor_en : 1;    // 行走电机使能
-    uint8_t drive_work_mode : 2;   // 行走电机工作模式
-    uint8_t drive_direction : 2;   // 行走电机方向
-    uint8_t drive_econ_mode : 2;   // 行走电机经济模式
-    uint8_t reserved1 : 1;         // 预留
+// 行走电机控制消息 (0x18000003)
+typedef struct ChanganWalkingControl {
+    // byte 0
+    uint8_t drive_motor_enable : 1;       // bit 0: 行走电机使能
+    uint8_t drive_work_mode : 2;          // bit 1-2: 工作模式
+    uint8_t drive_direction : 2;          // bit 3-4: 行走方向 (0=空档,1=前进,2=后退)
+    uint8_t drive_econ_mode : 2;          // bit 5-6: 经济模式
+    uint8_t reserved1 : 1;                // bit 7: 预留
     
-    // byte1 - byte2 (16位行走电机请求转速)
-    uint16_t drive_req_speed;      // 行走电机请求转速
+    // byte 1-2 (16位行走电机请求转速)
+    uint16_t drive_req_speed;             // 行走电机请求转速
     
-    // byte3 - byte4 (16位行走电机请求扭矩)
-    uint16_t drive_req_torque;     // 行走电机请求扭矩
+    // byte 3-4 (16位行走电机请求扭矩)
+    uint16_t drive_req_torque;            // 行走电机请求扭矩
     
-    // byte5 - byte6 (16位刹车电磁阀控制)
-    uint16_t brake_valve_current;  // 刹车电磁阀控制
+    // byte 5-6 (16位刹车电磁阀控制)
+    uint16_t brake_valve_current;         // 刹车电磁阀控制 (400-1600mA)
     
-    // byte7 (8位预留)
-    uint8_t reserved2;             // 预留
-}CA0x18000003Struct;
+    // byte 7
+    uint8_t reserved2;                    // 预留
+} CA_WalkingCtrl;
 
-// 上位机→VCU 控制命令4 (0x18000004)
-typedef struct CanCtrlCmd4 {
-    // byte0 - byte1 (16位大臂抬电磁阀)
-    uint16_t arm_up_current;       // 大臂抬电磁阀电流
+// 机构电磁阀控制消息 (0x18000004)
+typedef struct ChanganActuatorControl {
+    // byte 0-1 (16位大臂抬电磁阀)
+    uint16_t arm_up_current;              // 大臂抬电磁阀电流 (0-1500mA)
     
-    // byte2 - byte3 (16位大臂降电磁阀)
-    uint16_t arm_down_current;     // 大臂降电磁阀电流
+    // byte 2-3 (16位大臂降电磁阀)
+    uint16_t arm_down_current;            // 大臂降电磁阀电流 (0-1500mA)
     
-    // byte4 - byte5 (16位铲斗内收电磁阀)
-    uint16_t bucket_in_current;    // 铲斗内收电磁阀电流
+    // byte 4-5 (16位铲斗内收电磁阀)
+    uint16_t bucket_in_current;           // 铲斗内收电磁阀电流 (0-1500mA)
     
-    // byte6 - byte7 (16位铲斗外翻电磁阀)
-    uint16_t bucket_out_current;   // 铲斗外翻电磁阀电流
-}CA0x18000004Struct;
+    // byte 6-7 (16位铲斗外翻电磁阀)
+    uint16_t bucket_out_current;          // 铲斗外翻电磁阀电流 (0-1500mA)
+} CA_ActuatorCtrl;
 
 // ================================
 // VCU→上位机 信息定义
 // ================================
 
-// VCU→上位机 信息1 (0x181F0001)
-typedef struct CanVCUInfo1 {
-    // byte0
-    uint8_t high_voltage_sts : 1;  // 上高压状态
-    uint8_t parking_brake : 1;     // 停车制动
-    uint8_t soft_estop_sts : 1;    // 软急停状态
-    uint8_t left_turn_sts : 1;     // 左转向灯
-    uint8_t right_turn_sts : 1;    // 右转向灯
-    uint8_t vehicle_mode_sts : 1;  // 整车模式
-    uint8_t external_estop : 1;    // 外部急停状态
-    uint8_t reserved1 : 1;         // 预留
+// 状态反馈消息1 (0x181F0001)
+typedef struct ChanganStatusFeedback01 {
+    // byte 0
+    uint8_t high_voltage_sts : 1;         // bit 0: 上高压状态
+    uint8_t parking_brake : 1;            // bit 1: 停车制动
+    uint8_t soft_estop_sts : 1;           // bit 2: 软急停状态
+    uint8_t left_turn_sts : 1;            // bit 3: 左转向灯
+    uint8_t right_turn_sts : 1;           // bit 4: 右转向灯
+    uint8_t vehicle_mode_sts : 1;         // bit 5: 整车模式
+    uint8_t external_estop : 1;           // bit 6: 外部急停状态
+    uint8_t reserved1 : 1;                // bit 7: 预留
     
-    // byte1
-    uint8_t heartbeat_sts : 1;     // 心跳信号
-    uint8_t heartbeat_error : 1;   // 上位机心跳状态
-    uint8_t alarm_lights_sts : 5;  // 声光报警器
-    uint8_t charging_sts : 1;      // 充电状态
+    // byte 1
+    uint8_t heartbeat_sts : 1;            // bit 8: 心跳信号
+    uint8_t heartbeat_error : 1;          // bit 9: 上位机心跳状态
+    uint8_t alarm_lights_sts : 5;         // bit 10-14: 声光报警器
+    uint8_t charging_sts : 1;             // bit 15: 充电状态
     
-    // byte2 - byte3 (16位刹车控制电流)
-    uint16_t brake_current;        // 刹车控制电流
+    // byte 2-3 (16位刹车控制电流)
+    uint16_t brake_current;               // 刹车控制电流
     
-    // byte4 (8位设备电量)
-    uint8_t battery_soc;           // 设备电量
+    // byte 4 (8位设备电量)
+    uint8_t battery_soc;                  // 设备电量 (分辨率0.4)
     
-    // byte5
-    uint8_t arm_up_error : 1;      // 大臂抬电磁阀故障
-    uint8_t arm_down_error : 1;    // 大臂降电磁阀故障
-    uint8_t bucket_in_error : 1;   // 铲斗内收电磁阀故障
-    uint8_t bucket_out_error : 1;  // 铲斗外翻电磁阀故障
-    uint8_t brake_valve_error : 1; // 脚制动电磁阀故障
-    uint8_t steer_valve_error : 1; // 转向电磁阀故障
-    uint8_t drive_com_error : 1;   // 行走电机通讯故障
-    uint8_t hyd_com_error : 1;     // 液压电机通讯故障
+    // byte 5 (故障位)
+    uint8_t arm_up_error : 1;             // bit 40: 大臂抬电磁阀故障
+    uint8_t arm_down_error : 1;           // bit 41: 大臂降电磁阀故障
+    uint8_t bucket_in_error : 1;          // bit 42: 铲斗内收电磁阀故障
+    uint8_t bucket_out_error : 1;         // bit 43: 铲斗外翻电磁阀故障
+    uint8_t brake_valve_error : 1;        // bit 44: 脚制动电磁阀故障
+    uint8_t steer_valve_error : 1;        // bit 45: 转向电磁阀故障
+    uint8_t drive_com_error : 1;          // bit 46: 行走电机通讯故障
+    uint8_t hyd_com_error : 1;            // bit 47: 液压电机通讯故障
     
-    // byte6
-    uint8_t fault_level : 2;       // 本体故障等级
-    uint8_t low_beam_sts : 1;      // 近光灯状态
-    uint8_t high_beam_sts : 1;     // 远光灯状态
-    uint8_t work_light_sts : 1;    // 工作灯状态
-    uint8_t horn_feedback : 1;     // 喇叭反馈
-    uint8_t speed_gear_fb : 1;     // 速度档反馈
-    uint8_t steer_valve_estop : 1; // 转向阀故障急停
+    // byte 6
+    uint8_t fault_level : 2;              // bit 48-49: 本体故障等级
+    uint8_t low_beam_sts : 1;             // bit 50: 近光灯状态
+    uint8_t high_beam_sts : 1;            // bit 51: 远光灯状态
+    uint8_t work_light_sts : 1;           // bit 52: 工作灯状态
+    uint8_t horn_feedback : 1;            // bit 53: 喇叭反馈
+    uint8_t speed_gear_fb : 1;            // bit 54: 速度档反馈
+    uint8_t steer_valve_estop : 1;        // bit 55: 转向阀故障急停
     
-    // byte7
-    uint8_t arm_up_fb : 1;         // 大臂抬动作反馈
-    uint8_t arm_down_fb : 1;       // 大臂降动作反馈
-    uint8_t bucket_in_fb : 1;      // 铲斗内收动作反馈
-    uint8_t bucket_out_fb : 1;     // 铲斗外翻动作反馈
-    uint8_t left_valve_fb : 1;     // 左转电磁阀反馈
-    uint8_t right_valve_fb : 1;    // 右转电磁阀反馈
-    uint8_t reserved2 : 2;         // 预留
-} CA0x181F0001Struct;
+    // byte 7
+    uint8_t arm_up_fb : 1;                // bit 56: 大臂抬动作反馈
+    uint8_t arm_down_fb : 1;              // bit 57: 大臂降动作反馈
+    uint8_t bucket_in_fb : 1;             // bit 58: 铲斗内收动作反馈
+    uint8_t bucket_out_fb : 1;            // bit 59: 铲斗外翻动作反馈
+    uint8_t left_valve_fb : 1;            // bit 60: 左转电磁阀反馈
+    uint8_t right_valve_fb : 1;           // bit 61: 右转电磁阀反馈
+    uint8_t reserved2 : 2;                // bit 62-63: 预留
+} CA_StatusFB01;
 
-// VCU→上位机 信息2 (0x181F0002)
-typedef struct CanVCUInfo2 {
-    // byte0 - byte1 (16位液压电机实际转速)
-    uint16_t hyd_actual_speed;     // 液压电机实际转速
+// 电机状态消息2 (0x181F0002)
+typedef struct ChanganMotorStatus02 {
+    // byte 0-1 (16位液压电机实际转速)
+    uint16_t hyd_actual_speed;            // 液压电机实际转速
     
-    // byte2 - byte3 (16位液压电机实际扭矩)
-    uint16_t hyd_actual_torque;    // 液压电机实际扭矩
+    // byte 2-3 (16位液压电机实际扭矩)
+    uint16_t hyd_actual_torque;           // 液压电机实际扭矩
     
-    // byte4 - byte5 (16位液压电机电流)
-    uint16_t hyd_current;          // 液压电机电流
+    // byte 4-5 (16位液压电机电流)
+    uint16_t hyd_current;                 // 液压电机电流
     
-    // byte6
-    uint8_t hyd_motor_en : 1;      // 液压电机使能信号
-    uint8_t reserved1 : 2;          // 预留
-    uint8_t hyd_work_mode : 2;     // 液压电机工作模式
+    // byte 6
+    uint8_t hyd_motor_en : 1;             // bit 48: 液压电机使能信号
+    uint8_t reserved1 : 2;                // bit 49-50: 预留
+    uint8_t hyd_work_mode : 2;            // bit 51-52: 液压电机工作模式
+    uint8_t reserved2 : 3;                // bit 53-55: 预留
     
-    // byte7
-    uint8_t drive_motor_en : 1;    // 行走电机使能信号
-    uint8_t drive_direction : 2;   // 行进电机挡位信息
-    uint8_t drive_work_mode : 2;   // 行走电机工作模式
-    uint8_t drive_econ_mode : 2;   // 行走电机经济模式
-    uint8_t reserved2 : 1;         // 预留
-} CA0x181F0002Struct;
+    // byte 7
+    uint8_t drive_motor_en : 1;           // bit 56: 行走电机使能信号
+    uint8_t drive_direction : 2;          // bit 57-58: 行进电机挡位信息
+    uint8_t drive_work_mode : 2;          // bit 59-60: 行走电机工作模式
+    uint8_t drive_econ_mode : 2;          // bit 61-62: 行走电机经济模式
+    uint8_t reserved3 : 1;                // bit 63: 预留
+} CA_MotorStatus02;
 
-// VCU→上位机 信息3 (0x181F0003)
-typedef struct CanVCUInfo3 {
-    // byte0 - byte1 (16位行走电机电流)
-    uint16_t drive_current;         // 行走电机电流
+// 行走电机状态 (0x181F0003)
+typedef struct ChanganWalkingStatus {
+    // byte 0-1 (16位行走电机电流)
+    uint16_t drive_current;               // 行走电机电流
     
-    // byte2 - byte3 (16位行走电机实际扭矩)
-    uint16_t drive_actual_torque;   // 行走电机实际扭矩
+    // byte 2-3 (16位行走电机实际扭矩)
+    uint16_t drive_actual_torque;         // 行走电机实际扭矩
     
-    // byte4 - byte5 (16位行走电机转速/车速)
-    uint16_t drive_speed;           // 行走电机转速/车速
+    // byte 4-5 (16位行走电机转速/车速)
+    uint16_t drive_speed;                 // 行走电机转速/车速
     
-    // byte6 - byte7 (16位轮速)
-    uint16_t wheel_speed;           // 轮速
-} CA0x181F0003Struct;
+    // byte 6-7 (16位轮速)
+    uint16_t wheel_speed;                 // 轮速 (分辨率0.16, 范围0-60)
+} CA_WalkingStatus;
 
-// VCU→上位机 信息4 (0x181F0004)
-typedef struct CanVCUInfo4 {
-    // byte0 - byte1 (16位行进电机一功率)
-    uint16_t drive_power;          // 行进电机一功率
+// 丹佛斯转向 (0x181F0007)
+typedef struct ChanganDanfossSteering {
+    // byte 0-1 (16位丹佛斯方向机角度)
+    uint16_t danfoss_angle;               // 丹佛斯方向机角度 (0-4095)
     
-    // byte2 - byte3 (16位预留)
-    uint16_t reserved1;             // 预留
+    // byte 2 (8位丹佛斯状态)
+    uint8_t danfoss_status;               // 丹佛斯状态 (0x00=正常,0x11=初始化,0xFF=故障)
     
-    // byte4 - byte5 (16位液压电机功率)
-    uint16_t hyd_power;             // 液压电机功率
-    
-    // byte6 - byte7 (16位转向阀实际电流)
-    uint16_t steer_valve_current;  // 转向阀实际电流
-} CA0x181F0004Struct;
-
-// VCU→上位机 信息5 (0x181F0005)
-typedef struct CanVCUInfo5 {
-    // 64位动臂、铲斗实际反馈电流
-    uint16_t arm_up_feedback;       // 动臂举升反馈电流
-    uint16_t arm_down_feedback;     // 动臂下落反馈电流
-    uint16_t bucket_in_feedback;    // 铲斗收斗反馈电流
-    uint16_t bucket_out_feedback;   // 铲斗翻斗反馈电流
-} CA0x181F0005Struct;
-
-// VCU→上位机 信息6 (0x181F0006)
-typedef struct CanVCUInfo6 {
-    // 64位各个关节油压
-    uint16_t arm_large_pressure;    // 动臂大腔油压
-    uint16_t arm_small_pressure;    // 动臂小腔油压
-    uint16_t bucket_large_pressure; // 铲斗大腔油压
-    uint16_t bucket_small_pressure; // 铲斗小腔油压
-} CA0x181F0006Struct;
-
-// VCU→上位机 信息7 (0x181F0007)
-typedef struct CanVCUInfo7 {
-    // byte0 - byte1 (16位丹佛斯方向机角度)
-    uint16_t denison_angle;         // 丹佛斯方向机角度
-    
-    // byte2 (8位丹佛斯状态)
-    uint8_t denison_status;         // 丹佛斯状态
-    
-    // byte3 - byte7 (40位预留)
-    uint8_t reserved[5];            // 40位预留空间
-} CA0x181F0007Struct;
+    // byte 3-7 (40位预留)
+    uint8_t reserved[5];                  // 预留
+} CA_DanfossSteering;
 
 #pragma pack(pop)
 
-
-union CanFrameMsg {
-  //cmd1 模式 上下电 大灯 清故障等
-  CA0x18000001Struct CA0x181F0001St;
-  //cmd2 液压电机 转向阀等
-  CA0x18000002Struct CA0x181F0002St;
-  //cmd3 行走电机
-  CA0x18000003Struct CA0x181F0003St;
-  //cmd4 动臂铲斗电磁阀
-  CA0x18000004Struct CA0x181F0004St;
-
-  //info1 灯 故障 大臂铲斗动作等
-  CA0x181F0001Struct CA0x181F0001St;
-  //info2 液压电机 行走电机模式等
-  CA0x181F0002Struct CA0x181F0002St;
-  //info3 行走电机扭矩转速等
-  CA0x181F0003Struct CA0x181F0003St;
-  //info4 行走电机功率 液压电机功率 转向阀电流等
-  CA0x181F0004Struct CA0x181F0004St;
-  //info5 动臂铲斗电流等
-  CA0x181F0005Struct CA0x181F0005St;
-  //info6 动臂铲斗油压等
-  CA0x181F0006Struct CA0x181F0006St;
-  //info7 丹佛斯信息等
-  CA0x181F0007Struct CA0x181F0007St;
-
-  uint8_t canFrameData[8];
+// CAN消息联合体
+union ChanganCanFrameMsg {
+    // 控制命令
+    CA_ChassisCtrl    chassis_ctrl;
+    CA_HydraulicCtrl  hydraulic_ctrl;
+    CA_WalkingCtrl    walking_ctrl;
+    CA_ActuatorCtrl   actuator_ctrl;
+    
+    // 状态反馈
+    CA_StatusFB01        status_fb_01;
+    CA_MotorStatus02     motor_status_02;
+    CA_WalkingStatus     walking_status;
+    CA_DanfossSteering   danfoss_steering;
+    
+    uint8_t canFrameData[8];
 };
 
-
-class ChanganCANParser: public ChassisCan
-{
+/**
+ * @brief 长安车辆CAN协议解析器
+ */
+class ChanganCANParser : public ChassisCan {
 public:
     ChanganCANParser(std::string canPort);
     ~ChanganCANParser() = default;
-    // 解析CAN帧
-    std::optional<ChanganData> ParseCANFrame(const CANFrame& frame);
+    
     void initFuncMap() override;
     void SendCmdFunc() override;
-
+    
+    // 发送控制命令
+    void sendChassisControl();
+    void sendHydraulicControl();
+    void sendWalkingControl();
+    void sendActuatorControl();
+    
+    // 处理接收消息
+    void handle0x181F0001(struct Canframe *recvCanFrame);  // 状态反馈
+    void handle0x181F0002(struct Canframe *recvCanFrame);  // 电机状态
+    void handle0x181F0003(struct Canframe *recvCanFrame);  // 行走电机状态
+    void handle0x181F0007(struct Canframe *recvCanFrame);  // 丹佛斯转向
+    
+    void checkDataStructure();
+    
 private:
-    // 解析具体的数据字段
-    //std::optional<ChanganData> ParseDataField(const std::array<uint8_t, 8>& data);
+    // PID控制器实例
+    AccToSpeedController speed_controller_;      // 车速控制器
+    ValveToAngleController arm_controller_;      // 大臂角度控制器
+    ValveToAngleController bucket_controller_;   // 铲斗角度控制器
+    ValveToAngleController steer_controller_;    // 转向角度控制器
+    
+    // 当前反馈状态（从CAN读取）
+    double current_speed_;         // 当前车速 (m/s)
+    double current_arm_angle_;     // 当前大臂角度 (度)
+    double current_bucket_angle_;  // 当前铲斗角度 (度)
+    double current_steer_angle_;   // 当前转向角度 (度)
+    
+    // 心跳计数器
+    uint8_t heartbeat_counter_;
+    
+    // 初始化PID参数（可从launch文件配置）
+    void initPIDControllers();
 };
-*/
+
+} // namespace cannode

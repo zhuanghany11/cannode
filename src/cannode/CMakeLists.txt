@@ -89,6 +89,7 @@ target_include_directories(${MODULE_NAME}
   ${SHARED_INC_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
   ${CMAKE_CURRENT_SOURCE_DIR}/protobuf/out
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/low_level_controller
 )
 
 set(ABSEL_LIBARARY

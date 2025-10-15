@@ -19,4 +19,11 @@ doc/changan_protocol.dbc是长安车辆的dbc文件，也是我们需要使用�
 1. 将输入的vehicle_command中的车辆速度、大臂角度、铲斗角度、转向角度进行解析。
 2. 通过CAN总线读取3个倾角仪和1个转向角度编码器的数据，并将其解析为大臂角度、铲斗角度、车身转向角度数据。（当前可以保留接口，后续具体定义好CAN消息后再使用）
 3. 编写4个独立的闭环控制器，根据changan_protol.dbc的消息方式，分别将实现通过车辆加速度闭环控制车速、大臂液压阀开度闭环控制大臂角度、铲斗液压阀开度闭环控制铲斗、转向液压阀开度和方向闭环控制角度。
-4. 最后将加速度、大臂液压阀开度、铲斗液压阀开度、转向液压阀开度和方向的数据，按照changan_protocol.dbc的形式发送出去。
+其中acc_to_speed_controller是进行加速度到速度的闭环PID控制器。
+其中valve_to_angle_controller是液压阀开度到角度的闭环PID控制器。
+这两个PID控制器通过外部函数初始化进行PID参数配置和调整，参数可以在launch文件中进行修改。
+
+4. 最后将加速度、大臂液压阀开度、铲斗液压阀开度、转向液压阀开度和方向的数据，按照changan_protocol.dbc的形式发送出去。对于CAN总线数据的处理方式，可以参考python代码doc/changan/changan/joystick-to-can-tool/can_message_parser/data_assignment.py
+
+
+代码不需要编译，修改结束后任务就停止。
