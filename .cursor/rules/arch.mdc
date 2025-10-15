@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+已有的程序中 shantui.cc和shantui.h是进行参考的范本，不要修改其中的内容。
+xugong.cc和xugong.h可以忽略
+changan.cc和changan.h是主要进行修改的代码，其他部分的代码也可以根据情况进行修改。
+
+doc/

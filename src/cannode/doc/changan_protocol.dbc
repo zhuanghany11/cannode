@@ -1,0 +1,252 @@
+VERSION "1.0"
+
+NS_ :
+    NS_DESC_
+    CM_
+    BA_DEF_
+    BA_
+    VAL_
+    CAT_DEF_
+    CAT_
+    FILTER
+    BA_DEF_DEF_
+    EV_DATA_
+    ENVVAR_DATA_
+    SGTYPE_
+    SGTYPE_VAL_
+    BA_DEF_SGTYPE_
+    BA_SGTYPE_
+    SIG_TYPE_REF_
+    VAL_TABLE_
+    SIG_GROUP_
+    SIG_VALTYPE_
+    SIGTYPE_VALTYPE_
+    BO_TX_BU_
+    BA_DEF_REL_
+    BA_REL_
+    BA_DEF_DEF_REL_
+    BU_SG_REL_
+    BU_EV_REL_
+    BU_BO_REL_
+
+BS_:
+
+BU_: Controller VCU
+
+
+BA_DEF_ BO_  "VFrameFormat" ENUM  "StandardCAN","ExtendedCAN","reserved","J1939PG";
+
+BO_ 2550136833 Chassis_Control: 8 Controller
+ SG_ HighVoltage_Enable : 0|1@1+ (1,0) [0|1] "" VCU
+ SG_ Reserved1 : 1|1@1+ (1,0) [0|1] "" VCU
+ SG_ Soft_Emergency_Stop : 2|1@1+ (1,0) [0|1] "" VCU
+ SG_ Left_Turn_Light : 3|1@1+ (1,0) [0|1] "" VCU
+ SG_ Right_Turn_Light : 4|1@1+ (1,0) [0|1] "" VCU
+ SG_ Reserved2 : 5|2@1+ (1,0) [0|3] "" VCU
+ SG_ Vehicle_Mode : 7|1@1+ (1,0) [0|1] "" VCU
+ SG_ Reserved3 : 8|1@1+ (1,0) [0|1] "" VCU
+ SG_ Heartbeat_Signal : 9|1@1+ (1,0) [0|1] "" VCU
+ SG_ Speed_Gear : 10|1@1+ (1,0) [0|1] "" VCU
+ SG_ Work_Light : 11|1@1+ (1,0) [0|1] "" VCU
+ SG_ Clear_Steering_Error : 12|1@1+ (1,0) [0|1] "" VCU
+ SG_ High_Beam : 13|1@1+ (1,0) [0|1] "" VCU
+ SG_ Low_Beam : 14|1@1+ (1,0) [0|1] "" VCU
+ SG_ Horn : 15|1@1+ (1,0) [0|1] "" VCU
+ SG_ Sound_Light_Alarm : 16|5@1+ (1,0) [0|31] "" VCU
+ SG_ Clear_Error : 21|1@1+ (1,0) [0|1] "" VCU
+ SG_ Reserved4 : 22|2@1+ (1,0) [0|3] "" VCU
+ SG_ Reserved5 : 24|40@1+ (1,0) [0|0] "" VCU
+
+BO_ 2550136834 Hydraulic_Motor_Control: 8 Controller
+ SG_ Hydraulic_Motor_Enable : 0|1@1+ (1,0) [0|1] "" VCU
+ SG_ Hydraulic_Motor_Mode : 1|2@1+ (1,0) [0|3] "" VCU
+ SG_ Hydraulic_Economy_Mode : 3|2@1+ (1,0) [0|3] "" VCU
+ SG_ Steering_Valve_Direction : 5|2@1+ (1,0) [0|3] "" VCU
+ SG_ Reserved6 : 7|1@1+ (1,0) [0|1] "" VCU
+ SG_ Hydraulic_Motor_Torque : 8|16@1+ (1,0) [0|0] "" VCU
+ SG_ Hydraulic_Motor_Speed : 24|16@1+ (1,0) [0|0] "" VCU
+ SG_ Steering_Valve_Current : 40|16@1+ (1,0) [0|0] "" VCU
+
+BO_ 2550136835 Walking_Motor_Control: 8 Controller
+ SG_ Walking_Motor_Enable : 0|1@1+ (1,0) [0|1] "" VCU
+ SG_ Walking_Motor_Mode : 1|2@1+ (1,0) [0|3] "" VCU
+ SG_ Walking_Motor_Direction : 3|2@1+ (1,0) [0|3] "" VCU
+ SG_ Walking_Economy_Mode : 5|2@1+ (1,0) [0|3] "" VCU
+ SG_ Reserved7 : 7|1@1+ (1,0) [0|1] "" VCU
+ SG_ Walking_Motor_Speed : 8|16@1+ (1,0) [0|0] "" VCU
+ SG_ Walking_Motor_Torque : 24|16@1+ (1,0) [0|0] "" VCU
+ SG_ Brake_Valve_Current : 40|16@1+ (1,0) [0|0] "" VCU
+
+BO_ 2550136836 Actuator_Valve_Control: 8 Controller
+ SG_ Boom_Lift_Valve_Current : 0|16@1+ (1,0) [0|1500] "" VCU
+ SG_ Boom_Lower_Valve_Current : 16|16@1+ (1,0) [0|1500] "" VCU
+ SG_ Bucket_Retract_Valve_Current : 32|16@1+ (1,0) [0|1500] "" VCU
+ SG_ Bucket_Tilt_Valve_Current : 48|16@1+ (1,0) [0|1500] "" VCU
+
+
+BO_ 2552168449 Status_Feedback_01: 8 VCU
+ SG_ HighVoltage_Status : 0|1@1+ (1,0) [0|1] "" Controller
+ SG_ Parking_Brake : 1|1@1+ (1,0) [0|1] "" Controller
+ SG_ Soft_Emergency_Status : 2|1@1+ (1,0) [0|1] "" Controller
+ SG_ Turn_Left : 3|1@1+ (1,0) [0|1] "" Controller
+ SG_ Turn_Right : 4|1@1+ (1,0) [0|1] "" Controller
+ SG_ Vehicle_Mode_Status : 5|1@1+ (1,0) [0|1] "" Controller
+ SG_ External_Emergency_Status : 6|1@1+ (1,0) [0|1] "" Controller
+ SG_ Reserved8 : 7|1@1+ (1,0) [0|1] "" Controller
+ SG_ Heartbeat_Feedback : 8|1@1+ (1,0) [0|1] "" Controller
+ SG_ PC_Heartbeat_Status : 9|1@1+ (1,0) [0|1] "" Controller
+ SG_ Sound_Light_Alarm_Status : 10|5@1+ (1,0) [0|31] "" Controller
+ SG_ Charging_Status : 15|1@1+ (1,0) [0|1] "" Controller
+ SG_ Brake_Current : 16|16@1+ (1,0) [0|0] "" Controller
+ SG_ Battery_Level : 32|8@1+ (0.4,0) [0|0] "" Controller
+ SG_ Boom_Lift_Valve_Fault : 40|1@1+ (1,0) [0|1] "" Controller
+ SG_ Boom_Lower_Valve_Fault : 41|1@1+ (1,0) [0|1] "" Controller
+ SG_ Bucket_Retract_Valve_Fault : 42|1@1+ (1,0) [0|1] "" Controller
+ SG_ Bucket_Tilt_Valve_Fault : 43|1@1+ (1,0) [0|1] "" Controller
+ SG_ Foot_Brake_Valve_Fault : 44|1@1+ (1,0) [0|1] "" Controller
+ SG_ Steering_Valve_Fault : 45|1@1+ (1,0) [0|1] "" Controller
+ SG_ Walking_Motor_Comm_Fault : 46|1@1+ (1,0) [0|1] "" Controller
+ SG_ Hydraulic_Motor_Comm_Fault : 47|1@1+ (1,0) [0|1] "" Controller
+ SG_ Fault_Level : 48|2@1+ (1,0) [0|3] "" Controller
+ SG_ Low_Beam_Status : 50|1@1+ (1,0) [0|1] "" Controller
+ SG_ High_Beam_Status : 51|1@1+ (1,0) [0|1] "" Controller
+ SG_ Work_Light_Status : 52|1@1+ (1,0) [0|1] "" Controller
+ SG_ Horn_Feedback : 53|1@1+ (1,0) [0|1] "" Controller
+ SG_ Speed_Gear_Feedback : 54|1@1+ (1,0) [0|1] "" Controller
+ SG_ Steering_Valve_Emergency : 55|1@1+ (1,0) [0|1] "" Controller
+ SG_ Boom_Lift_Valve_Action : 56|1@1+ (1,0) [0|1] "" Controller
+ SG_ Boom_Lower_Valve_Action : 57|1@1+ (1,0) [0|1] "" Controller
+ SG_ Bucket_Retract_Valve_Action : 58|1@1+ (1,0) [0|1] "" Controller
+ SG_ Bucket_Tilt_Valve_Action : 59|1@1+ (1,0) [0|1] "" Controller
+ SG_ Left_Steering_Valve_Action : 60|1@1+ (1,0) [0|1] "" Controller
+ SG_ Right_Steering_Valve_Action : 61|1@1+ (1,0) [0|1] "" Controller
+ SG_ Reserved9 : 62|2@1+ (1,0) [0|3] "" Controller
+
+BO_ 2552168450 Motor_Status_02: 8 VCU
+ SG_ Hydraulic_Motor_Actual_Speed : 0|16@1+ (1,0) [0|30000] "" Controller
+ SG_ Hydraulic_Motor_Actual_Torque : 16|16@1+ (0.5,0) [0|10000] "" Controller
+ SG_ Hydraulic_Motor_Current : 32|16@1+ (0.05,0) [0|3000] "" Controller
+ SG_ Hydraulic_Motor_Enable_Status : 48|1@1+ (1,0) [0|1] "" Controller
+ SG_ Reserved10 : 49|2@1+ (1,0) [0|3] "" Controller
+ SG_ Hydraulic_Motor_Work_Mode : 51|2@1+ (1,0) [0|3] "" Controller
+ SG_ Walking_Motor_Enable_Status : 53|1@1+ (1,0) [0|1] "" Controller
+ SG_ Walking_Motor_Gear : 54|2@1+ (1,0) [0|3] "" Controller
+ SG_ Walking_Motor_Work_Mode : 56|2@1+ (1,0) [0|3] "" Controller
+ SG_ Walking Motor_Economy_Mode : 58|2@1+ (1,0) [0|3] "" Controller
+ SG_ Reserved11 : 60|4@1+ (1,0) [0|63] "" Controller
+
+BO_ 2552168451 Walking_Motor_Status: 8 VCU
+ SG_ Walking_Motor_Current : 0|16@1+ (0.05,0) [0|3000] "" Controller
+ SG_ Walking_Motor_Actual_Torque : 16|16@1+ (0.5,0) [0|10000] "" Controller
+ SG_ Walking_Motor_Speed : 32|16@1+ (1,0) [0|65535] "" Controller
+ SG_ Wheel_Speed : 48|16@1+ (0.16,0) [0|60] "" Controller
+
+BO_ 2552168452 Power_Information: 8 VCU
+ SG_ Walking_Motor_Power : 0|16@1+ (1,0) [0|0] "" Controller
+ SG_ Reserved12 : 16|16@1+ (1,0) [0|0] "" Controller
+ SG_ Hydraulic_Motor_Power : 32|16@1+ (1,0) [0|0] "" Controller
+ SG_ Steering_Valve_Actual_Current : 48|16@1+ (1,0) [0|0] "" Controller
+
+BO_ 2552168453 Valve_Current_Feedback: 8 VCU
+ SG_ Valve_Currents : 0|64@1+ (1,0) [0|0] "" Controller
+
+BO_ 2552168454 Joint_Pressure: 8 VCU
+ SG_ Joint_Pressures : 0|64@1+ (1,0) [0|0] "" Controller
+
+BO_ 2552168455 Danfoss_Steering: 8 VCU
+ SG_ Danfoss_Angle : 0|16@1+ (1,0) [0|4095] "" Controller
+ SG_ Danfoss_Status : 16|8@1+ (1,0) [0|255] "" Controller
+ SG_ Reserved13 : 24|40@1+ (1,0) [0|0] "" Controller
+
+CM_ BO_ 2550136833 "上位机发送给VCU的控制命令消息，包含各种控制信号";
+CM_ BO_ 2550136834 "上位机发送给VCU的液压电机控制消息";
+CM_ BO_ 2550136835 "上位机发送给VCU的行走电机控制消息";
+CM_ BO_ 2550136836 "上位机发送给VCU的执行器电磁阀控制消息";
+CM_ BO_ 2552168449 "VCU发送给上位机的状态反馈消息";
+CM_ BO_ 2552168450 "VCU发送给上位机的电机状态信息";
+CM_ BO_ 2552168451 "VCU发送给上位机的行走电机状态";
+CM_ BO_ 2552168452 "VCU发送给上位机的功率信息";
+CM_ BO_ 2552168453 "VCU发送给上位机的电磁阀电流反馈";
+CM_ BO_ 2552168454 "VCU发送给上位机的关节油压信息";
+CM_ BO_ 2552168455 "VCU发送给上位机的丹佛斯方向机信息";
+
+CM_ SG_ 2550136833 HighVoltage_Enable "整车上高压控制：1=上高压开管，0=下高压关管";
+CM_ SG_ 2550136833 Soft_Emergency_Stop "软急停：1=停止pwm和行进电机输出，0=不生效";
+CM_ SG_ 2550136833 Left_Turn_Light "左转灯控制：1=使能";
+CM_ SG_ 2550136833 Right_Turn_Light "右转灯控制：1=使能";
+CM_ SG_ 2550136833 Vehicle_Mode "整车模式切换：1=翻转当前状态";
+CM_ SG_ 2550136833 Heartbeat_Signal "心跳信号：200ms翻转一次";
+CM_ SG_ 2550136833 Speed_Gear "速度挡位：0=低速档，1=高速档";
+CM_ SG_ 2550136833 Work_Light "工作大灯：0=关闭，1=开启";
+CM_ SG_ 2550136833 Clear_Steering_Error "清除转向阀错误：1=生效一次";
+CM_ SG_ 2550136833 High_Beam "远光灯：0=关闭，1=开启";
+CM_ SG_ 2550136833 Low_Beam "近光灯：0=关闭，1=开启";
+CM_ SG_ 2550136833 Horn "喇叭：0=关闭，1=开启";
+CM_ SG_ 2550136833 Sound_Light_Alarm "声光报警器：每个bit对应红绿蓝黄白";
+CM_ SG_ 2550136833 Clear_Error "清错：1=生效一次，退出心跳安全状态";
+
+CM_ SG_ 2550136834 Hydraulic_Motor_Enable "液压电机使能：0=不使能，1=使能";
+CM_ SG_ 2550136834 Hydraulic_Motor_Mode "液压电机工作模式：0=不控制，1=扭矩，2=转速";
+CM_ SG_ 2550136834 Hydraulic_Economy_Mode "液压电机经济模式：0=标准，1=经济，2=动力";
+CM_ SG_ 2550136834 Steering_Valve_Direction "转向电磁阀方向：0=不控制，1=左转，2=右转";
+CM_ SG_ 2550136834 Hydraulic_Motor_Torque "（液压电机请求扭矩+5000）*2后发出，液压电机请求扭矩：范围-3000~3000";
+CM_ SG_ 2550136834 Hydraulic_Motor_Speed "液压电机请求转速：范围-15000~15000";
+CM_ SG_ 2550136834 Steering_Valve_Current "转向电磁阀电流控制：0~1500mA";
+
+CM_ SG_ 2550136835 Walking_Motor_Enable "行走电机使能：0=不使能，1=使能";
+CM_ SG_ 2550136835 Walking_Motor_Mode "行走电机工作模式：0=不控制，1=扭矩，2=转速";
+CM_ SG_ 2550136835 Walking_Motor_Direction "行走电机方向：0=空档，1=前进档，2=后退档";
+CM_ SG_ 2550136835 Walking_Economy_Mode "行走电机经济模式：0=标准，1=经济，2=动力";
+CM_ SG_ 2550136835 Walking_Motor_Speed "行走电机请求转速：范围-15000~15000";
+CM_ SG_ 2550136835 Walking_Motor_Torque "行走电机请求扭矩：范围-3000~3000";
+CM_ SG_ 2550136835 Brake_Valve_Current "刹车电磁阀：400~1600mA";
+
+
+CM_ SG_ 2550136836 Boom_Lift_Valve_Current "大臂抬电磁阀: 电流控制0~1500mA";
+CM_ SG_ 2550136836 Boom_Lower_Valve_Current "大臂降电磁阀: 电流控制0~1500mA";
+CM_ SG_ 2550136836 Bucket_Retract_Valve_Current "铲斗内收电磁阀: 电流控制0~1500mA";
+CM_ SG_ 2550136836 Bucket_Tilt_Valve_Current "铲斗外翻电磁阀: 电流控制0~1500mA";
+
+
+CM_ SG_ 2552168449 HighVoltage_Status "上高压状态：1=上高压";
+CM_ SG_ 2552168449 Parking_Brake "停车制动：1=有效";
+CM_ SG_ 2552168449 Soft_Emergency_Status "软急停状态：1=软急停";
+CM_ SG_ 2552168449 Vehicle_Mode_Status "整车模式：0=有人，1=无人";
+CM_ SG_ 2552168449 External_Emergency_Status "外部急停状态：1=急停触发";
+CM_ SG_ 2552168449 Heartbeat_Feedback "心跳反馈：200ms翻转";
+CM_ SG_ 2552168449 PC_Heartbeat_Status "上位机心跳状态：0=正常，1=错误";
+CM_ SG_ 2552168449 Sound_Light_Alarm_Status "声光报警器状态";
+CM_ SG_ 2552168449 Charging_Status "充电状态：0=不充电，1=充电";
+CM_ SG_ 2552168449 Brake_Current "刹车控制电流：mA";
+CM_ SG_ 2552168449 Battery_Level "设备电量：分辨率0.4";
+CM_ SG_ 2552168449 Low_Beam_Status "近光灯状态：0=关闭，1=打开";
+CM_ SG_ 2552168449 High_Beam_Status "远光灯状态：0=关闭，1=打开";
+CM_ SG_ 2552168449 Work_Light_Status "工作灯状态：0=关闭，1=打开";
+CM_ SG_ 2552168449 Horn_Feedback "喇叭反馈：0=不生效，1=生效";
+CM_ SG_ 2552168449 Speed_Gear_Feedback "速度档反馈：0=低速档，1=高速档";
+CM_ SG_ 2552168449 Steering_Valve_Emergency "转向阀故障急停：0=正常，1=错误";
+
+CM_ SG_ 2552168450 Hydraulic_Motor_Actual_Speed "液压电机实际转速：分辨率1，偏移-15000";
+CM_ SG_ 2552168450 Hydraulic_Motor_Actual_Torque "液压电机实际扭矩：分辨率0.5，偏移-5000";
+CM_ SG_ 2552168450 Hydraulic_Motor_Current "液压电机电流：分辨率0.05，偏移-1000";
+CM_ SG_ 2552168450 Hydraulic_Motor_Enable_Status "液压电机使能状态：1=使能";
+CM_ SG_ 2552168450 Hydraulic_Motor_Work_Mode "液压电机工作模式状态";
+CM_ SG_ 2552168450 Walking_Motor_Enable_Status "行走电机使能状态：1=使能";
+CM_ SG_ 2552168450 Walking_Motor_Gear "行进电机挡位：0=空档，1=前进档，2=后退档";
+CM_ SG_ 2552168450 Walking_Motor_Work_Mode "行走电机工作模式状态";
+
+CM_ SG_ 2552168451 Walking_Motor_Current "行走电机电流：分辨率0.05，偏移-1000";
+CM_ SG_ 2552168451 Walking_Motor_Actual_Torque "行走电机实际扭矩：分辨率0.5，偏移-5000";
+CM_ SG_ 2552168451 Walking_Motor_Speed "行走电机转速/车速";
+CM_ SG_ 2552168451 Wheel_Speed "轮速：分辨率0.16，范围0~60";
+
+CM_ SG_ 2552168452 Walking_Motor_Power "行走电机功率：W，1s平均功率";
+CM_ SG_ 2552168452 Hydraulic_Motor_Power "液压电机功率：W，1s平均功率";
+CM_ SG_ 2552168452 Steering_Valve_Actual_Current "转向阀实际电流：mA";
+
+CM_ SG_ 2552168453 Valve_Currents "动臂、铲斗实际反馈电流：动臂举升、下落、铲斗收、翻，每个2bytes";
+
+CM_ SG_ 2552168454 Joint_Pressures "各个关节油压：动臂大小腔、铲斗大小腔，每个2bytes";
+
+CM_ SG_ 2552168455 Danfoss_Angle "丹佛斯方向机角度：0-4095";
+CM_ SG_ 2552168455 Danfoss_Status "丹佛斯状态：0x00=正常，0x11=初始化，0xFF=故障";
