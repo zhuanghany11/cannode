@@ -260,45 +260,118 @@ union ChanganCanFrameMsg {
 };
 
 /**
- * @brief 长安车辆CAN协议解析器
+ * @brief 长安车辆 CAN 协议解析器
+ *
+ * 角色：
+ *  - 订阅上位机控制指令（由 MsgManager 注入的 protobuf），周期发送 4 类控制报文
+ *  - 监听 VCU 状态与角度传感器/编码器反馈，更新 chassisProtoMsg 与内部反馈变量
+ *  - 维护 4 个闭环控制器：车速（加速度→速度）、大臂角、铲斗角、转向角
  */
 class ChanganCANParser : public ChassisCan {
 public:
     ChanganCANParser(std::string canPort);
     ~ChanganCANParser() = default;
     
+    /**
+     * @brief 注册 CAN ID→处理函数 的回调映射
+     * 调用处：构造函数内，用于将接收到的帧分发到对应 handler。
+     */
     void initFuncMap() override;
+    /**
+     * @brief 周期发送控制与计算 dt 的入口（由底层线程定时调用）
+     * 调用处：`ChassisCan::SendCmdProc()` 内部。
+     */
     void SendCmdFunc() override;
     
     // 发送控制命令
+    /**
+     * @brief 发送 0x18000001 底盘控制（模式/心跳/灯光）
+     * 调用处：`SendCmdFunc()` 内部，周期下发基础控制。
+     */
     void sendChassisControl();
+    /**
+     * @brief 发送 0x18000002 液压/转向控制（含转向阀 PID 输出）
+     * @param dt 控制周期（秒），用于 PID。
+     * 调用处：`SendCmdFunc()` 内部。
+     */
     void sendHydraulicControl(double dt);
+    /**
+     * @brief 发送 0x18000003 行走控制（速度闭环→扭矩/速度请求）
+     * @param dt 控制周期（秒），用于 PID。
+     * 调用处：`SendCmdFunc()` 内部。
+     */
     void sendWalkingControl(double dt);
+    /**
+     * @brief 发送 0x18000004 执行机构控制（大臂/铲斗角度闭环→电流）
+     * @param dt 控制周期（秒），用于 PID。
+     * 调用处：`SendCmdFunc()` 内部。
+     */
     void sendActuatorControl(double dt);
     
     // 处理接收消息
+    /**
+     * @brief 解析 0x181F0001 状态反馈，更新驾驶模式/故障位等
+     * 调用处：CAN 接收线程回调分发。
+     */
     void handle0x181F0001(struct Canframe *recvCanFrame);  // 状态反馈
+    /**
+     * @brief 解析 0x181F0002 电机状态，更新档位/液压电机状态
+     * 调用处：CAN 接收线程回调分发。
+     */
     void handle0x181F0002(struct Canframe *recvCanFrame);  // 电机状态
+    /**
+     * @brief 解析 0x181F0003 行走状态，更新速度反馈（m/s）
+     * 调用处：CAN 接收线程回调分发。
+     */
     void handle0x181F0003(struct Canframe *recvCanFrame);  // 行走电机状态
+    /**
+     * @brief 解析 0x181F0007 丹佛斯转向，编码器缺失时备用角度
+     * 调用处：CAN 接收线程回调分发。
+     */
     void handle0x181F0007(struct Canframe *recvCanFrame);  // 丹佛斯转向
 
     // 角度与倾角传感器（新增）
+    /**
+     * @brief 解析 0x00000581 车体倾角（Y_pitch）
+     * 调用处：CAN 接收线程回调分发。
+     */
     void handle0x00000581(struct Canframe *recvCanFrame);  // 车体倾角仪（Y_pitch）
+    /**
+     * @brief 解析 0x00000582 大臂倾角（Y_pitch）
+     * 调用处：CAN 接收线程回调分发。
+     */
     void handle0x00000582(struct Canframe *recvCanFrame);  // 大臂倾角仪（Y_pitch）
+    /**
+     * @brief 解析 0x00000583 铲斗倾角（Y_pitch）
+     * 调用处：CAN 接收线程回调分发。
+     */
     void handle0x00000583(struct Canframe *recvCanFrame);  // 铲斗倾角仪（Y_pitch）
+    /**
+     * @brief 解析 0x18FF0015 转向角编码器（byte1..2/100.0 度）
+     * 调用处：CAN 接收线程回调分发。
+     */
     void handle0x18FF0015(struct Canframe *recvCanFrame);  // 转向角度编码器
     
+    /**
+     * @brief 静态断言校验各 CAN 结构体大小是否为 8 字节
+     * 调用处：构造函数内，保证与 DBC 对齐。
+     */
     void checkDataStructure();
     
     // ======= 外部配置接口（用于从launch/参数动态配置）=======
+    /** @brief 配置车速 PID 参数 */
     void setSpeedPid(double kp, double ki, double kd,
                      double max_output, double min_output, double max_integral);
+    /** @brief 配置大臂角 PID 参数 */
     void setArmPid(double kp, double ki, double kd,
                    double max_output, double min_output, double max_integral, double deadzone);
+    /** @brief 配置铲斗角 PID 参数 */
     void setBucketPid(double kp, double ki, double kd,
                       double max_output, double min_output, double max_integral, double deadzone);
+    /** @brief 配置转向角 PID 参数 */
     void setSteerPid(double kp, double ki, double kd,
                      double max_output, double min_output, double max_integral, double deadzone);
+    /** @brief 配置大臂/铲斗/转向零点偏置 */
     void setZeroOffsets(double boom_zero_deg, double bucket_zero_deg, double steer_zero_deg);
 
 private:
@@ -341,6 +414,7 @@ private:
     } angle_sensors_;
 
     // 根据当前 angle_sensors_ 计算相对角并写入 chassisProtoMsg
+    // 调用处：各倾角/编码器回调中，统一刷新反馈与底盘状态。
     void updateRelativeAnglesAndChassis();
 
     // 是否收到过转向角编码器数据

@@ -6,27 +6,24 @@
 namespace cannode {
 
 /**
- * @brief 液压阀开度到角度的PID控制器
- * 
- * 该控制器接收目标角度和当前角度，计算出合适的液压阀开度指令
- * 用于大臂、铲斗、转向等液压执行机构的角度闭环控制
+ * @brief 液压阀开度到角度的 PID 控制器
+ *
+ * 用途：输入目标角度与当前角度，输出阀开度（或电流）指令。
  */
 class ValveToAngleController {
 public:
-    /**
-     * @brief 构造函数，使用默认参数初始化
-     */
+    /** @brief 构造函数，使用默认参数初始化 */
     ValveToAngleController();
     
     /**
-     * @brief 初始化PID参数
+     * @brief 初始化 PID 参数
      * @param kp 比例增益
      * @param ki 积分增益
      * @param kd 微分增益
-     * @param max_output 最大输出限幅（最大阀开度）
-     * @param min_output 最小输出限幅（最小阀开度）
+     * @param max_output 输出上限（最大阀开度/电流）
+     * @param min_output 输出下限（最小阀开度/电流）
      * @param max_integral 积分限幅
-     * @param deadzone 死区范围（在此范围内不输出）
+     * @param deadzone 误差死区（度），在此范围内不输出
      */
     void init(double kp, double ki, double kd, 
               double max_output, double min_output, double max_integral, double deadzone = 0.5);
@@ -35,30 +32,19 @@ public:
      * @brief 计算控制输出
      * @param target_angle 目标角度 (度)
      * @param current_angle 当前角度 (度)
-     * @param dt 时间间隔 (s)
-     * @return 计算得到的阀开度指令（取决于配置，可能是电流值mA或百分比）
+     * @param dt 控制周期 (s)
+     * @return 阀开度/电流 指令
      */
     double compute(double target_angle, double current_angle, double dt);
     
-    /**
-     * @brief 重置控制器状态
-     */
+    /** @brief 重置控制器状态（误差/积分） */
     void reset();
     
-    /**
-     * @brief 获取当前误差
-     */
+    /** @brief 获取当前误差 */
     double getError() const { return error_; }
-    
-    /**
-     * @brief 获取积分项
-     */
+    /** @brief 获取积分项 */
     double getIntegral() const { return integral_; }
-    
-    /**
-     * @brief 设置死区范围
-     * @param deadzone 死区大小（度）
-     */
+    /** @brief 设置死区范围 */
     void setDeadzone(double deadzone) { deadzone_ = deadzone; }
 
 private:
@@ -71,7 +57,7 @@ private:
     double max_output_;   // 最大输出（最大阀开度）
     double min_output_;   // 最小输出（最小阀开度）
     double max_integral_; // 积分限幅
-    double deadzone_;     // 死区范围
+    double deadzone_;     // 死区范围（度）
     
     // 状态变量
     double error_;        // 当前误差

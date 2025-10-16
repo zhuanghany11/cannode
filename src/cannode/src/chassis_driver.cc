@@ -16,32 +16,20 @@ using namespace control::canbus;
 ChassisCan::ChassisCan(std::string canPort)
     : SocketCanInterface(canPort)
 {
-    // 初始化控制信息
-    //memset(&set_vehicle_info_, 0, sizeof(HostToVCU1));
-    //memset(&set_boom_lift_info_, 0, sizeof(HostToVCU2));
-    //memset(&set_hydraulic_motor_info_, 0, sizeof(HostToVCUB1EF));
-    //memset(&set_walk_motor_info_, 0, sizeof(HostToVCUB0EE));
-    
-    // 初始化VCU上报的信息
-    //memset(&chassisProtoMsg, 0, sizeof(control::canbus::Chassis));
+    // 初始化底盘状态消息对象
     chassisProtoMsg.Clear();
 }
 
 ChassisCan::~ChassisCan(){}
 
-/**
- * @brief 获取底盘状态消息, chassis中定义管理底盘can数据
- */
+// 获取底盘状态消息（加锁返回引用）
 control::canbus::Chassis& ChassisCan::get_chassis_status_msg()
 {
     std::lock_guard<std::mutex> lk(vehicleStatusMutex);
     return chassisProtoMsg;
 }
 
-/**
- * @brief WireCan::setCtlCmd 回调接收控制命令后调用
- * @param cmd
- */
+// 设置控制指令（ROS2 订阅回调注入）
 void ChassisCan::setCtlCmd(const control::ControlCommand& cmd) {
 
   std::lock_guard<std::mutex> lk(vehicleCtlCmdMutex);
@@ -53,17 +41,13 @@ void ChassisCan::setCtlCmd(const control::ControlCommand& cmd) {
   // DiagTestAssignment();
 }
 
-/**
- * @brief ChassisCan::SendCmdProc,发送控制命令线程函数
-*/
+// 发送控制命令线程函数：心跳计数并调用派生类 SendCmdFunc
 void ChassisCan::SendCmdProc() {
     (VCU_heartbeat_cnt++ > 200) ? VCU_Life1 = false : VCU_Life1 = true;
     SendCmdFunc();
 }
 
-/**
- * @brief ChassisCan::Initialize,msg中二阶构造完成后显式调用
- */
+// 初始化：创建发送与接收线程，并设置线程名
 void ChassisCan::Initialize() {
   std::thread can_send_thread([&]() {
     //ProcessScheduler::setThreadPriority(SCHED_FIFO, 95);
@@ -136,20 +120,14 @@ void ChassisCan::StartRecv() {
   }
 }
 
-/**
- * @brief WireCan::HandleRecvData
- * @param recvCanFrame
- */
+// 处理接收帧：掩掉 EFF 标志并调用分发函数
 void ChassisCan::HandleRecvData(struct Canframe *recvCanFrame) {
   //if(!CanA::Instance()->flag_can_adaptor_init_complete){return;}
   recvCanFrame->frame.can_id &= CAN_EFF_MASK;
   callHandleWireCanCmdFunc(recvCanFrame);
 }
 
-/**
- * @brief WireCan::callHandleWireCanCmdFunc
- * @param recvCanFrame
- */
+// 根据 map 分发到具体 handler（含健壮性检查）
 void ChassisCan::callHandleWireCanCmdFunc(struct Canframe *recvCanFrame) {
   try {
     if((handleChassisCanFuncMap.find(recvCanFrame->frame.can_id) == handleChassisCanFuncMap.end())

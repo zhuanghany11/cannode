@@ -6,10 +6,9 @@
 namespace cannode {
 
 /**
- * @brief 加速度到速度的PID控制器
- * 
- * 该控制器接收目标速度和当前速度，计算出合适的加速度指令
- * 用于车辆速度的闭环控制
+ * @brief 加速度到速度的 PID 控制器
+ *
+ * 用途：输入目标速度与当前速度，输出加速度指令（m/s^2）。
  */
 class AccToSpeedController {
 public:
@@ -19,12 +18,12 @@ public:
     AccToSpeedController();
     
     /**
-     * @brief 初始化PID参数
+     * @brief 初始化 PID 参数
      * @param kp 比例增益
      * @param ki 积分增益
      * @param kd 微分增益
-     * @param max_output 最大输出限幅
-     * @param min_output 最小输出限幅
+     * @param max_output 输出上限（加速度）
+     * @param min_output 输出下限（加速度）
      * @param max_integral 积分限幅
      */
     void init(double kp, double ki, double kd, 
@@ -34,24 +33,19 @@ public:
      * @brief 计算控制输出
      * @param target_speed 目标速度 (m/s)
      * @param current_speed 当前速度 (m/s)
-     * @param dt 时间间隔 (s)
-     * @return 计算得到的加速度指令 (m/s^2)
+     * @param dt 控制周期 (s)
+     * @return 加速度指令 (m/s^2)
      */
     double compute(double target_speed, double current_speed, double dt);
     
     /**
-     * @brief 重置控制器状态
+     * @brief 重置控制器状态（误差/积分）
      */
     void reset();
     
-    /**
-     * @brief 获取当前误差
-     */
+    /** @brief 获取当前误差 */
     double getError() const { return error_; }
-    
-    /**
-     * @brief 获取积分项
-     */
+    /** @brief 获取积分项 */
     double getIntegral() const { return integral_; }
 
 private:

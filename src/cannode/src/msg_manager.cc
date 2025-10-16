@@ -64,7 +64,7 @@ void MsgManager::msgProc() {
     PublishChassisStatus();
 }
 
-// 接收处理控制命令信息
+// 接收处理控制命令信息：反序列化并注入到底层解析器
 void MsgManager::procControlImplement(const sa_msgs::msg::ProtoAdapter::SharedPtr msg) const {
     // 从 ROS2 消息中提取数据
     std::string serialized_data(msg->pb.begin(), msg->pb.end());
@@ -106,6 +106,7 @@ flatbuffers::DetachedBuffer MsgManager::genWireControlVehicleStatusOutput(void) 
   return flatbuffers::DetachedBuffer();
 }
 */
+// 发布底盘状态：从解析器获取 chassisProtoMsg 并封装为 ProtoAdapter 发布
 void MsgManager::PublishChassisStatus()
 {
     auto message = sa_msgs::msg::ProtoAdapter(); //ros数据msg

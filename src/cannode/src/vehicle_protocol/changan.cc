@@ -21,6 +21,8 @@ ChanganCANParser::ChanganCANParser(std::string canPort)
   initFuncMap();
 }
 
+// 注册各个 CAN ID 对应的解析函数，用于将收到的帧分发至对应 handler
+// 调用处：构造函数内
 void ChanganCANParser::initFuncMap() {
     // 注册CAN消息处理函数
     handleChassisCanFuncMap[CA_STATUS_FB_01] = 
@@ -43,6 +45,8 @@ void ChanganCANParser::initFuncMap() {
         static_cast<void (ChassisCan::*)(Canframe*)>(&ChanganCANParser::handle0x18FF0015);
 }
 
+// 初始化 4 个 PID 控制器（默认参数，可由外部接口覆盖）
+// 调用处：构造函数内
 void ChanganCANParser::initPIDControllers() {
     // 初始化速度控制器 (加速度到速度)
     // 参数可以从launch文件配置，这里使用默认值
@@ -118,6 +122,8 @@ void ChanganCANParser::setZeroOffsets(double boom_zero_deg, double bucket_zero_d
     angle_sensors_.steer_zero_offset_deg = steer_zero_deg;
 }
 
+// 周期发送入口：计算真实 dt，并分发 4 类发送函数
+// 调用处：`ChassisCan::SendCmdProc()` 周期线程
 void ChanganCANParser::SendCmdFunc() {
     static int cnt_20ms = 0;
     static int cnt_50ms = 0;
@@ -143,6 +149,8 @@ void ChanganCANParser::SendCmdFunc() {
     }
 }
 
+// 发送 0x18000001 底盘控制（上高压/心跳/模式等）
+// 调用处：SendCmdFunc()
 void ChanganCANParser::sendChassisControl() {
     CA_ChassisCtrl chassisCtrl = {0};
     can_frame canFrame;
@@ -177,6 +185,8 @@ void ChanganCANParser::sendChassisControl() {
     SendCanFrame(canFrame);
 }
 
+// 发送 0x18000002 液压/转向控制（转向阀 PID 输出电流与方向）
+// 调用处：SendCmdFunc()
 void ChanganCANParser::sendHydraulicControl(double dt) {
     CA_HydraulicCtrl hydraulicCtrl = {0};
     can_frame canFrame;
@@ -232,6 +242,8 @@ void ChanganCANParser::sendHydraulicControl(double dt) {
     SendCanFrame(canFrame);
 }
 
+// 发送 0x18000003 行走控制（速度闭环→扭矩/速度请求与方向）
+// 调用处：SendCmdFunc()
 void ChanganCANParser::sendWalkingControl(double dt) {
     CA_WalkingCtrl walkingCtrl = {0};
     can_frame canFrame;
@@ -290,6 +302,8 @@ void ChanganCANParser::sendWalkingControl(double dt) {
     SendCanFrame(canFrame);
 }
 
+// 发送 0x18000004 执行机构控制（大臂/铲斗角度闭环输出电流择向）
+// 调用处：SendCmdFunc()
 void ChanganCANParser::sendActuatorControl(double dt) {
     CA_ActuatorCtrl actuatorCtrl = {0};
     can_frame canFrame;
@@ -349,6 +363,8 @@ void ChanganCANParser::sendActuatorControl(double dt) {
 // 接收消息处理函数
 // ================================
 
+// 解析 0x181F0001 状态反馈，更新驾驶模式/电量/故障位
+// 调用处：CAN 接收线程分发
 void ChanganCANParser::handle0x181F0001(struct Canframe *recvCanFrame) {
     // 状态反馈消息
     if (recvCanFrame->frame.can_dlc != 8) {
@@ -381,6 +397,8 @@ void ChanganCANParser::handle0x181F0001(struct Canframe *recvCanFrame) {
     }
 }
 
+// 解析 0x181F0002 电机状态，更新档位/液压电机状态
+// 调用处：CAN 接收线程分发
 void ChanganCANParser::handle0x181F0002(struct Canframe *recvCanFrame) {
     // 电机状态消息
     if (recvCanFrame->frame.can_dlc != 8) {
@@ -417,6 +435,8 @@ void ChanganCANParser::handle0x181F0002(struct Canframe *recvCanFrame) {
     }
 }
 
+// 解析 0x181F0003 行走状态，更新速度反馈（km/h→m/s）
+// 调用处：CAN 接收线程分发
 void ChanganCANParser::handle0x181F0003(struct Canframe *recvCanFrame) {
     // 行走电机状态消息
     if (recvCanFrame->frame.can_dlc != 8) {
@@ -438,6 +458,8 @@ void ChanganCANParser::handle0x181F0003(struct Canframe *recvCanFrame) {
     }
 }
 
+// 解析 0x181F0007 丹佛斯转向；编码器缺失时可作为兜底角度
+// 调用处：CAN 接收线程分发
 void ChanganCANParser::handle0x181F0007(struct Canframe *recvCanFrame) {
     // 丹佛斯转向消息
     if (recvCanFrame->frame.can_dlc != 8) {
@@ -470,6 +492,8 @@ void ChanganCANParser::handle0x181F0007(struct Canframe *recvCanFrame) {
 // 2) 其次尝试 int16 小端缩放 0.01 在 byte[4..5]
 // 3) 再次尝试 int16 大端缩放 0.01 在 byte[4..5]
 // 4) 兜底返回0.0
+// 兼容多种格式从 8 字节帧解析 Y_pitch（度）
+// 用途：不同固件版本的布局可能差异
 static double parseYPitchDegFromSenseFrame(const uint8_t data[8]) {
     // 尝试 float32 小端 (bytes 4..7)
     union { float f; uint32_t u; } conv = {0};
@@ -500,6 +524,7 @@ static double parseYPitchDegFromSenseFrame(const uint8_t data[8]) {
     return 0.0;
 }
 
+// 依据原始倾角/编码器值，计算相对角并写入底盘状态
 void ChanganCANParser::updateRelativeAnglesAndChassis() {
     // 计算相对角，加入零点标定
     angle_sensors_.boom_rel_body_deg =
@@ -526,6 +551,7 @@ void ChanganCANParser::updateRelativeAnglesAndChassis() {
     }
 }
 
+// 解析 0x00000581 车体倾角（Y_pitch）
 void ChanganCANParser::handle0x00000581(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
@@ -535,6 +561,7 @@ void ChanganCANParser::handle0x00000581(struct Canframe *recvCanFrame) {
     }
 }
 
+// 解析 0x00000582 大臂倾角（Y_pitch）
 void ChanganCANParser::handle0x00000582(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
@@ -544,6 +571,7 @@ void ChanganCANParser::handle0x00000582(struct Canframe *recvCanFrame) {
     }
 }
 
+// 解析 0x00000583 铲斗倾角（Y_pitch）
 void ChanganCANParser::handle0x00000583(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
@@ -553,6 +581,7 @@ void ChanganCANParser::handle0x00000583(struct Canframe *recvCanFrame) {
     }
 }
 
+// 解析 0x18FF0015 转向角编码器（byte1..2/100.0 度）
 void ChanganCANParser::handle0x18FF0015(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
@@ -567,6 +596,7 @@ void ChanganCANParser::handle0x18FF0015(struct Canframe *recvCanFrame) {
     }
 }
 
+// 静态断言校验各结构体大小为 8 字节，保证与 DBC 对齐
 void ChanganCANParser::checkDataStructure() {
     // 确保结构体大小正确
     static_assert(sizeof(CA_ChassisCtrl) == 8, "Invalid CA_ChassisCtrl size");
