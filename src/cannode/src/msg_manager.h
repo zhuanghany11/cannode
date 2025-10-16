@@ -21,7 +21,7 @@
 #include "sa_msgs/msg/proto_adapter.hpp"
 #include "chassis_driver.h"
 #include "vehicle_protocol/shantui.h"
-
+#include "vehicle_protocol/changan.h"
 namespace cannode {
 
 #define CAN_CFG_FILE "config/can_adapter.yaml"

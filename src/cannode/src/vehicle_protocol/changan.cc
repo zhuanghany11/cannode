@@ -4,6 +4,7 @@
 #include <cstring>
 #include <mutex>
 #include <linux/can.h>
+#include <cmath>
 
 namespace cannode {
 
@@ -30,6 +31,16 @@ void ChanganCANParser::initFuncMap() {
         static_cast<void (ChassisCan::*)(Canframe*)>(&ChanganCANParser::handle0x181F0003);
     handleChassisCanFuncMap[CA_DANFOSS_STEERING] = 
         static_cast<void (ChassisCan::*)(Canframe*)>(&ChanganCANParser::handle0x181F0007);
+
+    // 倾角仪与转向角编码器（新增）
+    handleChassisCanFuncMap[CA_IMU_BODY_PITCH] =
+        static_cast<void (ChassisCan::*)(Canframe*)>(&ChanganCANParser::handle0x00000581);
+    handleChassisCanFuncMap[CA_IMU_BOOM_PITCH] =
+        static_cast<void (ChassisCan::*)(Canframe*)>(&ChanganCANParser::handle0x00000582);
+    handleChassisCanFuncMap[CA_IMU_BUCKET_PITCH] =
+        static_cast<void (ChassisCan::*)(Canframe*)>(&ChanganCANParser::handle0x00000583);
+    handleChassisCanFuncMap[CA_STEER_ENCODER] =
+        static_cast<void (ChassisCan::*)(Canframe*)>(&ChanganCANParser::handle0x18FF0015);
 }
 
 void ChanganCANParser::initPIDControllers() {
@@ -80,17 +91,55 @@ void ChanganCANParser::initPIDControllers() {
     std::cout << "[ChanganCANParser] PID控制器初始化完成" << std::endl;
 }
 
+// ================= PID/零点外部配置接口实现 =================
+void ChanganCANParser::setSpeedPid(double kp, double ki, double kd,
+                                   double max_output, double min_output, double max_integral) {
+    speed_controller_.init(kp, ki, kd, max_output, min_output, max_integral);
+}
+
+void ChanganCANParser::setArmPid(double kp, double ki, double kd,
+                                 double max_output, double min_output, double max_integral, double deadzone) {
+    arm_controller_.init(kp, ki, kd, max_output, min_output, max_integral, deadzone);
+}
+
+void ChanganCANParser::setBucketPid(double kp, double ki, double kd,
+                                    double max_output, double min_output, double max_integral, double deadzone) {
+    bucket_controller_.init(kp, ki, kd, max_output, min_output, max_integral, deadzone);
+}
+
+void ChanganCANParser::setSteerPid(double kp, double ki, double kd,
+                                   double max_output, double min_output, double max_integral, double deadzone) {
+    steer_controller_.init(kp, ki, kd, max_output, min_output, max_integral, deadzone);
+}
+
+void ChanganCANParser::setZeroOffsets(double boom_zero_deg, double bucket_zero_deg, double steer_zero_deg) {
+    angle_sensors_.boom_zero_offset_deg = boom_zero_deg;
+    angle_sensors_.bucket_zero_offset_deg = bucket_zero_deg;
+    angle_sensors_.steer_zero_offset_deg = steer_zero_deg;
+}
+
 void ChanganCANParser::SendCmdFunc() {
     static int cnt_20ms = 0;
     static int cnt_50ms = 0;
     
+    // 计算真实 dt（秒）
+    double dt = 0.02; // fallback
+    auto now = std::chrono::steady_clock::now();
+    if (last_ctrl_time_inited_) {
+        std::chrono::duration<double> d = now - last_ctrl_time_;
+        dt = d.count();
+        if (dt <= 0.0 || dt > 0.2) { dt = 0.02; } // 异常保护
+    }
+    last_ctrl_time_ = now;
+    last_ctrl_time_inited_ = true;
+
     // 20ms发送一次控制命令
     if (++cnt_20ms >= 2) {
         cnt_20ms = 0;
         sendChassisControl();
-        sendHydraulicControl();
-        sendWalkingControl();
-        sendActuatorControl();
+        sendHydraulicControl(dt);
+        sendWalkingControl(dt);
+        sendActuatorControl(dt);
     }
 }
 
@@ -110,8 +159,8 @@ void ChanganCANParser::sendChassisControl() {
         // 软急停（可从control_cmd获取）
         chassisCtrl.soft_estop = ctl_cmd.estop() ? 1 : 0;
         
-        // 心跳信号（200ms翻转一次，即每20次调用翻转一次，20ms*20=400ms实际，这里简化为计数）
-        if (++heartbeat_counter_ >= 10) {  // 20ms * 10 = 200ms
+        // 心跳信号（至少200ms翻转一次，即每20次调用翻转一次，20ms*20=400ms实际，这里简化为计数，每次都翻转。）
+        if (++heartbeat_counter_ >= 1) {  // 20ms * 10 = 200ms
             heartbeat_counter_ = 0;
             chassisCtrl.heartbeat = !chassisCtrl.heartbeat;
         } else {
@@ -128,7 +177,7 @@ void ChanganCANParser::sendChassisControl() {
     SendCanFrame(canFrame);
 }
 
-void ChanganCANParser::sendHydraulicControl() {
+void ChanganCANParser::sendHydraulicControl(double dt) {
     CA_HydraulicCtrl hydraulicCtrl = {0};
     can_frame canFrame;
     
@@ -141,26 +190,29 @@ void ChanganCANParser::sendHydraulicControl() {
         // 液压电机使能
         hydraulicCtrl.hyd_motor_enable = 1;
         
-        // 液压电机工作模式: 1=扭矩模式, 2=转速模式
-        hydraulicCtrl.hyd_work_mode = 2;  // 转速模式
+        // 液压电机工作模式: 1=转速模式, 2=扭矩模式
+        hydraulicCtrl.hyd_work_mode = 1;  // 转速模式
         
         // 液压电机经济模式: 0=标准, 1=经济, 2=动力
         hydraulicCtrl.hyd_econ_mode = 0;  // 标准模式
         
-        // 液压电机转速 (范围-15000~15000, 默认2000rpm，底层发送17000)
+        // 液压电机转速 (范围-15000~15000, 恒定物理值2000rpm，CAN发送17000)
         hydraulicCtrl.hyd_req_speed = 17000;  // 物理值2000rpm
         
-        // 液压电机扭矩 (范围-3000~3000, 默认3000Nm)
+        // 液压电机扭矩 (范围-3000~3000, 有3000的offset, 默认物理值为0Nm, CAN发送3000)
         hydraulicCtrl.hyd_req_torque = 3000;
         
         // 转向控制 - 使用转向角度控制器
         // steering_target 是百分比 [-100, 100]，需要转换为角度 (假设±50度)
         double target_steer_percentage = ctl_cmd.steering_target();
         double target_steer_angle = target_steer_percentage * 0.5;  // 转换为角度 (-50~50度)
-        double dt = 0.02;  // 20ms = 0.02s
+        // dt 由 SendCmdFunc 实时计算传入
         
         // 计算转向阀电流 (通过PID控制器)
         double steer_valve_current = steer_controller_.compute(target_steer_angle, current_steer_angle_, dt);
+        // 取绝对值并限幅到 [0, 500] (上限是1500 mA）
+        double steer_valve_current_abs = std::fabs(steer_valve_current);
+        if (steer_valve_current_abs > 500.0) steer_valve_current_abs = 500.0;
         
         // 确定转向方向
         double angle_error = target_steer_angle - current_steer_angle_;
@@ -172,15 +224,15 @@ void ChanganCANParser::sendHydraulicControl() {
             hydraulicCtrl.steer_valve_dir = 0;  // 不转向
         }
         
-        // 设置转向阀电流
-        hydraulicCtrl.steer_valve_current = static_cast<uint16_t>(steer_valve_current);
+        // 设置转向阀电流（幅值）
+        hydraulicCtrl.steer_valve_current = static_cast<uint16_t>(steer_valve_current_abs);
     }
     
     memcpy(canFrame.data, &hydraulicCtrl, sizeof(CA_HydraulicCtrl));
     SendCanFrame(canFrame);
 }
 
-void ChanganCANParser::sendWalkingControl() {
+void ChanganCANParser::sendWalkingControl(double dt) {
     CA_WalkingCtrl walkingCtrl = {0};
     can_frame canFrame;
     
@@ -193,32 +245,28 @@ void ChanganCANParser::sendWalkingControl() {
         // 行走电机使能
         walkingCtrl.drive_motor_enable = 1;
         
-        // 行走电机工作模式: 1=扭矩模式, 2=转速模式
-        walkingCtrl.drive_work_mode = 2;  // 转速模式
+        // 行走电机工作模式:  1=转速模式, 2=扭矩模式（按头文件注释统一）
+        walkingCtrl.drive_work_mode = 2;  // 扭矩模式，后续按需求切换
         
         // 行走电机经济模式
         walkingCtrl.drive_econ_mode = 0;  // 标准模式
         
         // 从control_cmd获取目标速度
         double target_speed = ctl_cmd.speed();  // m/s
-        double dt = 0.02;  // 20ms = 0.02s
+        // dt 由 SendCmdFunc 实时计算传入
         
         // 使用速度控制器计算所需加速度
         double acceleration = speed_controller_.compute(target_speed, current_speed_, dt);
         
         // 根据加速度计算扭矩（简化模型：扭矩正比于加速度）
-        // 这里需要根据实际车辆参数调整，暂时使用线性映射
-        // 加速度范围 [-3, 3] m/s^2 映射到扭矩范围 [-3000, 3000]
-        int16_t torque = static_cast<int16_t>(acceleration * 1000.0);
-        torque = std::max(static_cast<int16_t>(-3000), std::min(torque, static_cast<int16_t>(3000)));
+        // 加速度范围 [0, 2] m/s^2 -> 扭矩绝对值 [0, 200] Nm （最大值3000,但需要限幅）
+        int32_t torque_cmd = static_cast<int32_t>(std::round(std::abs(acceleration) * 100.0));
+        if (torque_cmd > 200) torque_cmd = 200;
+        // 数据下发增加一个3000的offset
+        walkingCtrl.drive_req_torque = static_cast<uint16_t>(torque_cmd+3000);
         
-        // 设置行走电机扭矩
-        walkingCtrl.drive_req_torque = static_cast<uint16_t>(torque);
-        
-        // 设置行走电机转速（范围-15000~15000）
-        // 速度映射到转速，假设最大速度5m/s对应15000rpm
-        int16_t rpm = static_cast<int16_t>(target_speed * 3000.0);
-        walkingCtrl.drive_req_speed = static_cast<uint16_t>(15000 + rpm);  // 偏移15000
+        // 设置行走电机转速（范围-15000~15000），无作用，加速度由扭矩控制。
+        walkingCtrl.drive_req_speed = static_cast<uint16_t>(15000);
         
         // 确定行走方向
         if (target_speed > 0.1) {
@@ -230,6 +278,7 @@ void ChanganCANParser::sendWalkingControl() {
         }
         
         // 刹车控制（如果有驻车制动请求）
+        // TODO： 目前没有通过制动进行车辆控制的功能。
         if (ctl_cmd.parking_brake()) {
             walkingCtrl.brake_valve_current = 1200;  // 刹车电流 (400-1600mA)
         } else {
@@ -241,7 +290,7 @@ void ChanganCANParser::sendWalkingControl() {
     SendCanFrame(canFrame);
 }
 
-void ChanganCANParser::sendActuatorControl() {
+void ChanganCANParser::sendActuatorControl(double dt) {
     CA_ActuatorCtrl actuatorCtrl = {0};
     can_frame canFrame;
     
@@ -251,20 +300,22 @@ void ChanganCANParser::sendActuatorControl() {
     {
         std::lock_guard<std::mutex> lk(vehicleCtlCmdMutex);
         
-        double dt = 0.02;  // 20ms = 0.02s
+        // dt 由 SendCmdFunc 实时计算传入
         
         // 大臂控制 - 使用角度控制器
         double target_arm_angle = ctl_cmd.arm_angle();  // 从control_cmd获取目标大臂角度
         double arm_valve_current = arm_controller_.compute(target_arm_angle, current_arm_angle_, dt);
+        double arm_valve_current_abs = std::fabs(arm_valve_current);
+        if (arm_valve_current_abs > 500.0) arm_valve_current_abs = 500.0;
         
         // 根据误差方向确定大臂动作
         double arm_error = target_arm_angle - current_arm_angle_;
         if (arm_error > 0.5) {  // 需要抬起
-            actuatorCtrl.arm_up_current = static_cast<uint16_t>(arm_valve_current);
+            actuatorCtrl.arm_up_current = static_cast<uint16_t>(arm_valve_current_abs);
             actuatorCtrl.arm_down_current = 0;
         } else if (arm_error < -0.5) {  // 需要下降
             actuatorCtrl.arm_up_current = 0;
-            actuatorCtrl.arm_down_current = static_cast<uint16_t>(arm_valve_current);
+            actuatorCtrl.arm_down_current = static_cast<uint16_t>(arm_valve_current_abs);
         } else {  // 在死区内，不动作
             actuatorCtrl.arm_up_current = 0;
             actuatorCtrl.arm_down_current = 0;
@@ -273,15 +324,17 @@ void ChanganCANParser::sendActuatorControl() {
         // 铲斗控制 - 使用角度控制器
         double target_bucket_angle = ctl_cmd.shovel_angle();  // 从control_cmd获取目标铲斗角度
         double bucket_valve_current = bucket_controller_.compute(target_bucket_angle, current_bucket_angle_, dt);
+        double bucket_valve_current_abs = std::fabs(bucket_valve_current);
+        if (bucket_valve_current_abs > 500.0) bucket_valve_current_abs = 500.0;
         
         // 根据误差方向确定铲斗动作
         double bucket_error = target_bucket_angle - current_bucket_angle_;
         if (bucket_error > 0.5) {  // 需要外翻
-            actuatorCtrl.bucket_out_current = static_cast<uint16_t>(bucket_valve_current);
+            actuatorCtrl.bucket_out_current = static_cast<uint16_t>(bucket_valve_current_abs);
             actuatorCtrl.bucket_in_current = 0;
         } else if (bucket_error < -0.5) {  // 需要内收
             actuatorCtrl.bucket_out_current = 0;
-            actuatorCtrl.bucket_in_current = static_cast<uint16_t>(bucket_valve_current);
+            actuatorCtrl.bucket_in_current = static_cast<uint16_t>(bucket_valve_current_abs);
         } else {  // 在死区内，不动作
             actuatorCtrl.bucket_out_current = 0;
             actuatorCtrl.bucket_in_current = 0;
@@ -397,18 +450,120 @@ void ChanganCANParser::handle0x181F0007(struct Canframe *recvCanFrame) {
     {
         std::lock_guard<std::mutex> lk(vehicleStatusMutex);
         
-        // 更新转向角度 (0-4095映射到实际角度范围，假设-50到+50度)
-        double raw_angle = canFrameUnion.danfoss_steering.danfoss_angle;
-        current_steer_angle_ = (raw_angle / 4095.0) * 100.0 - 50.0;  // 映射到-50~+50度
-        chassisProtoMsg.set_steering_percentage(current_steer_angle_);
-        
-        // TODO: 这里需要添加从倾角仪读取大臂和铲斗角度的逻辑
-        // 当前先使用0作为占位，等待CAN消息ID确定后再实现
-        // 例如：
-        // current_arm_angle_ = xxx;
-        // current_bucket_angle_ = xxx;
-        // chassisProtoMsg.set_arm_angle(current_arm_angle_);
-        // chassisProtoMsg.set_shovel_angle(current_bucket_angle_);
+        // 若未收到编码器，则可用丹佛斯角作为备用（映射 -50~+50 度）功能没有启用。
+        // if (!steer_encoder_available_) {
+        //     double raw_angle = canFrameUnion.danfoss_steering.danfoss_angle;
+        //     current_steer_angle_ = (raw_angle / 4095.0) * 100.0 - 50.0;
+        //     // 存入百分比：角度 / 50deg * 100
+        //     double steering_percentage = (current_steer_angle_ / 50.0) * 100.0;
+        //     chassisProtoMsg.set_steering_percentage(static_cast<float>(steering_percentage));
+        // }
+    }
+}
+
+// ================================
+// 新增：倾角仪与角度编码器解析
+// ================================
+
+// 尝试从8字节数据解析Y轴俯仰角（度）
+// 1) 优先尝试 float32 小端在 byte[4..7]
+// 2) 其次尝试 int16 小端缩放 0.01 在 byte[4..5]
+// 3) 再次尝试 int16 大端缩放 0.01 在 byte[4..5]
+// 4) 兜底返回0.0
+static double parseYPitchDegFromSenseFrame(const uint8_t data[8]) {
+    // 尝试 float32 小端 (bytes 4..7)
+    union { float f; uint32_t u; } conv = {0};
+    conv.u = static_cast<uint32_t>(data[4]) |
+             (static_cast<uint32_t>(data[5]) << 8) |
+             (static_cast<uint32_t>(data[6]) << 16) |
+             (static_cast<uint32_t>(data[7]) << 24);
+    if (std::isfinite(conv.f) && std::fabs(conv.f) <= 180.0) {
+        return static_cast<double>(conv.f);
+    }
+
+    // 尝试 int16 小端缩放0.01 (bytes 4..5)
+    int16_t v_le = static_cast<int16_t>(static_cast<uint16_t>(data[4]) |
+                (static_cast<uint16_t>(data[5]) << 8));
+    double deg_le = static_cast<double>(v_le) * 0.01;
+    if (std::fabs(deg_le) <= 180.0) {
+        return deg_le;
+    }
+
+    // 尝试 int16 大端缩放0.01 (bytes 4..5)
+    int16_t v_be = static_cast<int16_t>(static_cast<uint16_t>(data[5]) |
+                (static_cast<uint16_t>(data[4]) << 8));
+    double deg_be = static_cast<double>(v_be) * 0.01;
+    if (std::fabs(deg_be) <= 180.0) {
+        return deg_be;
+    }
+
+    return 0.0;
+}
+
+void ChanganCANParser::updateRelativeAnglesAndChassis() {
+    // 计算相对角，加入零点标定
+    angle_sensors_.boom_rel_body_deg =
+        (angle_sensors_.boom_pitch_y_deg - angle_sensors_.body_pitch_y_deg) +
+        angle_sensors_.boom_zero_offset_deg;
+
+    angle_sensors_.bucket_rel_boom_deg =
+        (angle_sensors_.bucket_pitch_y_deg - angle_sensors_.boom_pitch_y_deg) +
+        angle_sensors_.bucket_zero_offset_deg;
+
+    // 更新内部当前角度
+    current_arm_angle_ = angle_sensors_.boom_rel_body_deg;
+    current_bucket_angle_ = angle_sensors_.bucket_rel_boom_deg;
+
+    // 将角度写入 chassisProtoMsg
+    chassisProtoMsg.set_arm_angle(static_cast<float>(current_arm_angle_));
+    chassisProtoMsg.set_shovel_angle(static_cast<float>(current_bucket_angle_));
+
+    // 转向角（若编码器有效，带零点）
+    if (steer_encoder_available_) {
+        current_steer_angle_ = angle_sensors_.steering_angle_deg + angle_sensors_.steer_zero_offset_deg;
+        double steering_percentage = (current_steer_angle_ / 50.0) * 100.0;
+        chassisProtoMsg.set_steering_percentage(static_cast<float>(steering_percentage));
+    }
+}
+
+void ChanganCANParser::handle0x00000581(struct Canframe *recvCanFrame) {
+    if (recvCanFrame->frame.can_dlc != 8) { return; }
+    {
+        std::lock_guard<std::mutex> lk(vehicleStatusMutex);
+        angle_sensors_.body_pitch_y_deg = parseYPitchDegFromSenseFrame(recvCanFrame->frame.data);
+        updateRelativeAnglesAndChassis();
+    }
+}
+
+void ChanganCANParser::handle0x00000582(struct Canframe *recvCanFrame) {
+    if (recvCanFrame->frame.can_dlc != 8) { return; }
+    {
+        std::lock_guard<std::mutex> lk(vehicleStatusMutex);
+        angle_sensors_.boom_pitch_y_deg = parseYPitchDegFromSenseFrame(recvCanFrame->frame.data);
+        updateRelativeAnglesAndChassis();
+    }
+}
+
+void ChanganCANParser::handle0x00000583(struct Canframe *recvCanFrame) {
+    if (recvCanFrame->frame.can_dlc != 8) { return; }
+    {
+        std::lock_guard<std::mutex> lk(vehicleStatusMutex);
+        angle_sensors_.bucket_pitch_y_deg = parseYPitchDegFromSenseFrame(recvCanFrame->frame.data);
+        updateRelativeAnglesAndChassis();
+    }
+}
+
+void ChanganCANParser::handle0x18FF0015(struct Canframe *recvCanFrame) {
+    if (recvCanFrame->frame.can_dlc != 8) { return; }
+    {
+        std::lock_guard<std::mutex> lk(vehicleStatusMutex);
+        // byte[1..2] 拼接为角度*100（假定大端字节序），单位：度
+        uint16_t raw = static_cast<uint16_t>((recvCanFrame->frame.data[1] << 8) |
+                                             recvCanFrame->frame.data[2]);
+        double deg = static_cast<double>(raw) / 100.0;
+        angle_sensors_.steering_angle_deg = deg;
+        steer_encoder_available_ = true;
+        updateRelativeAnglesAndChassis();
     }
 }
 

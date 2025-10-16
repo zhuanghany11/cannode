@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <linux/can.h>
+#include <chrono>
 #include "../chassis_driver.h"
 #include "../low_level_controller/acc_to_speed_controller.h"
 #include "../low_level_controller/valve_to_angle_controller.h"
@@ -24,6 +25,15 @@ enum ChanganCanProtoId {
     CA_VALVE_CURRENT_FB = 0x181F0005,  // 阀电流反馈
     CA_JOINT_PRESSURE   = 0x181F0006,  // 关节油压
     CA_DANFOSS_STEERING = 0x181F0007   // 丹佛斯转向
+};
+
+// 角度传感器与倾角仪 CAN 消息ID（参考 Read_angle_sensors/doc/Sense_DBC.dbc）
+// 注：以下ID为实际在总线使用的ID（若DBC给出ID需-0x80000000，则此处已为减法后的结果）
+enum ChanganAngleSensorId {
+    CA_IMU_BODY_PITCH   = 0x00000581,  // 车体倾角仪（使用Y_pitch）
+    CA_IMU_BOOM_PITCH   = 0x00000582,  // 大臂倾角仪（使用Y_pitch）
+    CA_IMU_BUCKET_PITCH = 0x00000583,  // 铲斗倾角仪（使用Y_pitch）
+    CA_STEER_ENCODER    = 0x18FF0015   // 转向角度编码器（byte[1..2] / 100.0 -> 度）
 };
 
 #pragma pack(push, 1)
@@ -262,18 +272,35 @@ public:
     
     // 发送控制命令
     void sendChassisControl();
-    void sendHydraulicControl();
-    void sendWalkingControl();
-    void sendActuatorControl();
+    void sendHydraulicControl(double dt);
+    void sendWalkingControl(double dt);
+    void sendActuatorControl(double dt);
     
     // 处理接收消息
     void handle0x181F0001(struct Canframe *recvCanFrame);  // 状态反馈
     void handle0x181F0002(struct Canframe *recvCanFrame);  // 电机状态
     void handle0x181F0003(struct Canframe *recvCanFrame);  // 行走电机状态
     void handle0x181F0007(struct Canframe *recvCanFrame);  // 丹佛斯转向
+
+    // 角度与倾角传感器（新增）
+    void handle0x00000581(struct Canframe *recvCanFrame);  // 车体倾角仪（Y_pitch）
+    void handle0x00000582(struct Canframe *recvCanFrame);  // 大臂倾角仪（Y_pitch）
+    void handle0x00000583(struct Canframe *recvCanFrame);  // 铲斗倾角仪（Y_pitch）
+    void handle0x18FF0015(struct Canframe *recvCanFrame);  // 转向角度编码器
     
     void checkDataStructure();
     
+    // ======= 外部配置接口（用于从launch/参数动态配置）=======
+    void setSpeedPid(double kp, double ki, double kd,
+                     double max_output, double min_output, double max_integral);
+    void setArmPid(double kp, double ki, double kd,
+                   double max_output, double min_output, double max_integral, double deadzone);
+    void setBucketPid(double kp, double ki, double kd,
+                      double max_output, double min_output, double max_integral, double deadzone);
+    void setSteerPid(double kp, double ki, double kd,
+                     double max_output, double min_output, double max_integral, double deadzone);
+    void setZeroOffsets(double boom_zero_deg, double bucket_zero_deg, double steer_zero_deg);
+
 private:
     // PID控制器实例
     AccToSpeedController speed_controller_;      // 车速控制器
@@ -292,6 +319,36 @@ private:
     
     // 初始化PID参数（可从launch文件配置）
     void initPIDControllers();
+
+    // ================= 统一的角度/倾角传感器数据维护结构 ================
+    struct AngleSensorsData {
+        // 原始Y轴俯仰（来自各自倾角仪），单位：度
+        double body_pitch_y_deg = 0.0;    // 车体
+        double boom_pitch_y_deg = 0.0;    // 大臂（绝对）
+        double bucket_pitch_y_deg = 0.0;  // 铲斗（绝对）
+
+        // 相对角（经差分及零点标定），单位：度
+        double boom_rel_body_deg = 0.0;    // 大臂相对车体
+        double bucket_rel_boom_deg = 0.0;  // 铲斗相对大臂
+
+        // 转向角（来自角度编码器），单位：度
+        double steering_angle_deg = 0.0;
+
+        // 零点标定偏置（单位：度），正值表示加在计算后的相对角上
+        double boom_zero_offset_deg = 0.0;    // 大臂相对车体零点
+        double bucket_zero_offset_deg = 0.0;  // 铲斗相对大臂零点
+        double steer_zero_offset_deg = 0.0;   // 转向角零点
+    } angle_sensors_;
+
+    // 根据当前 angle_sensors_ 计算相对角并写入 chassisProtoMsg
+    void updateRelativeAnglesAndChassis();
+
+    // 是否收到过转向角编码器数据
+    bool steer_encoder_available_ = false;
+
+    // 控制周期时间戳（用于计算真实 dt）
+    std::chrono::steady_clock::time_point last_ctrl_time_;
+    bool last_ctrl_time_inited_ = false;
 };
 
 } // namespace cannode

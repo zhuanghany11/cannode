@@ -22,6 +22,8 @@ MsgManager::MsgManager(): Node("chassis_node") {
   chassis_status_pub = this->create_publisher<sa_msgs::msg::ProtoAdapter>("/SaVehicleReportV2", 10);
   chassis_cmd_sub = this->create_subscription<sa_msgs::msg::ProtoAdapter>(
       "/vehicle_command", 10, std::bind(&MsgManager::procControlImplement, this, std::placeholders::_1));
+
+  // 预留：节点参数用于PID与零点标定配置（未来可通过 declare_parameter/get_parameter 下发到解析器）
 }
 
 MsgManager::~MsgManager() {
@@ -208,7 +210,7 @@ void MsgManager::cannodeCreateInstance() {
       chassisCanHandler = std::make_shared<ShantuiCANParser>(chassis_can_port);
       break;
     case CHANGAN:
-      chassisCanHandler = std::make_shared<ShantuiCANParser>(chassis_can_port);
+      chassisCanHandler = std::make_shared<ChanganCANParser>(chassis_can_port);
       break;
     case SHANTUI:
       chassisCanHandler = std::make_shared<ShantuiCANParser>(chassis_can_port);
