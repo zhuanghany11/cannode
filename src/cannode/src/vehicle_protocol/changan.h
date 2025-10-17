@@ -30,9 +30,9 @@ enum ChanganCanProtoId {
 // 角度传感器与倾角仪 CAN 消息ID（参考 Read_angle_sensors/doc/Sense_DBC.dbc）
 // 注：以下ID为实际在总线使用的ID（若DBC给出ID需-0x80000000，则此处已为减法后的结果）
 enum ChanganAngleSensorId {
-    CA_IMU_BODY_PITCH   = 0x00000581,  // 车体倾角仪（使用Y_pitch）
-    CA_IMU_BOOM_PITCH   = 0x00000582,  // 大臂倾角仪（使用Y_pitch）
-    CA_IMU_BUCKET_PITCH = 0x00000583,  // 铲斗倾角仪（使用Y_pitch）
+    CA_IMU_BODY_PITCH   = 0x80000581,  // 车体倾角仪（使用X_roll）
+    CA_IMU_BOOM_PITCH   = 0x80000582,  // 大臂倾角仪（使用X_roll）
+    CA_IMU_BUCKET_PITCH = 0x80000583,  // 铲斗倾角仪（使用X_roll）
     CA_STEER_ENCODER    = 0x18FF0015   // 转向角度编码器（byte[1..2] / 100.0 -> 度）
 };
 
@@ -332,20 +332,20 @@ public:
 
     // 角度与倾角传感器（新增）
     /**
-     * @brief 解析 0x00000581 车体倾角（Y_pitch）
+     * @brief 解析 0x00000581 车体倾角（X_roll）
      * 调用处：CAN 接收线程回调分发。
      */
-    void handle0x00000581(struct Canframe *recvCanFrame);  // 车体倾角仪（Y_pitch）
+    void handle0x00000581(struct Canframe *recvCanFrame);  // 车体倾角仪（X_roll）
     /**
-     * @brief 解析 0x00000582 大臂倾角（Y_pitch）
+     * @brief 解析 0x00000582 大臂倾角（X_roll）
      * 调用处：CAN 接收线程回调分发。
      */
-    void handle0x00000582(struct Canframe *recvCanFrame);  // 大臂倾角仪（Y_pitch）
+    void handle0x00000582(struct Canframe *recvCanFrame);  // 大臂倾角仪（X_roll）
     /**
-     * @brief 解析 0x00000583 铲斗倾角（Y_pitch）
+     * @brief 解析 0x00000583 铲斗倾角（X_roll）
      * 调用处：CAN 接收线程回调分发。
      */
-    void handle0x00000583(struct Canframe *recvCanFrame);  // 铲斗倾角仪（Y_pitch）
+    void handle0x00000583(struct Canframe *recvCanFrame);  // 铲斗倾角仪（X_roll）
     /**
      * @brief 解析 0x18FF0015 转向角编码器（byte1..2/100.0 度）
      * 调用处：CAN 接收线程回调分发。
@@ -399,6 +399,11 @@ private:
         double body_pitch_y_deg = 0.0;    // 车体
         double boom_pitch_y_deg = 0.0;    // 大臂（绝对）
         double bucket_pitch_y_deg = 0.0;  // 铲斗（绝对）
+
+        // 原始X轴横滚（来自各自倾角仪），单位：度
+        double body_roll_x_deg = 0.0;     // 车体
+        double boom_roll_x_deg = 0.0;     // 大臂（绝对）
+        double bucket_roll_x_deg = 0.0;   // 铲斗（绝对）
 
         // 相对角（经差分及零点标定），单位：度
         double boom_rel_body_deg = 0.0;    // 大臂相对车体

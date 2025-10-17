@@ -142,11 +142,11 @@ void MsgManager::PublishChassisStatus()
     //Chassisptmsg.set_steer_mode(controlcommand.steering_model());
      chassisptmsg.SerializeToString(&str);
      uint32_t len = str.size();
-     std::cout << "len: " << len << std::endl;
+    //  std::cout << "len: " << len << std::endl;
      message.pb.assign(str.begin(), str.end());
 
      chassis_status_pub->publish(message);
-     RCLCPP_INFO(this->get_logger(), "Publishing: mode=%d", chassisptmsg.driving_mode());
+    //  RCLCPP_INFO(this->get_logger(), "Publishing: mode=%d", chassisptmsg.driving_mode());
      //std::cout << "publish data." << " mode: "<< chassisptmsg.driving_mode() <<std::endl;
 }
 

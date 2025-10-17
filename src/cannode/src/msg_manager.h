@@ -74,7 +74,7 @@ class MsgManager : public rclcpp::Node {
   //构建socket can节点实例所需参数，及cannode内部使用参数
   int32_t vcu_type{1};
   std::string chassis_can_port = "can0";
-  int64_t chassis_can_baud{250000};
+  int64_t chassis_can_baud{1000000};
   std::shared_ptr<ChassisCan> chassisCanHandler;
 
  private:

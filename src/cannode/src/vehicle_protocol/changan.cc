@@ -206,11 +206,12 @@ void ChanganCANParser::sendHydraulicControl(double dt) {
         // 液压电机经济模式: 0=标准, 1=经济, 2=动力
         hydraulicCtrl.hyd_econ_mode = 0;  // 标准模式
         
-        // 液压电机转速 (范围-15000~15000, 恒定物理值2000rpm，CAN发送17000)
-        hydraulicCtrl.hyd_req_speed = 17000;  // 物理值2000rpm
+        // 液压电机转速 (范围-15000~15000, 零值为15000，平时默认发送稳定转速，物理值2000rpm)
+        // 注意：如果需要设置实际转速，可以从control_cmd中读取
+        hydraulicCtrl.hyd_req_speed = 17000;  // 默认发送稳定转速，物理值2000rpm
         
         // 液压电机扭矩 (范围-3000~3000, 有3000的offset, 默认物理值为0Nm, CAN发送3000)
-        hydraulicCtrl.hyd_req_torque = 3000;
+        hydraulicCtrl.hyd_req_torque = 3000;  // 零值，物理值0Nm
         
         // 转向控制 - 使用转向角度控制器
         // steering_target 是百分比 [-100, 100]，需要转换为角度 (假设±50度)
@@ -484,43 +485,19 @@ void ChanganCANParser::handle0x181F0007(struct Canframe *recvCanFrame) {
 }
 
 // ================================
-// 新增：倾角仪与角度编码器解析
+// 倾角仪与角度编码器解析
 // ================================
-
-// 尝试从8字节数据解析Y轴俯仰角（度）
-// 1) 优先尝试 float32 小端在 byte[4..7]
-// 2) 其次尝试 int16 小端缩放 0.01 在 byte[4..5]
-// 3) 再次尝试 int16 大端缩放 0.01 在 byte[4..5]
+// 尝试从8字节数据解析X轴横滚角（度）
+// 设备为小端解析 data[1]+data[0]
 // 4) 兜底返回0.0
-// 兼容多种格式从 8 字节帧解析 Y_pitch（度）
-// 用途：不同固件版本的布局可能差异
-static double parseYPitchDegFromSenseFrame(const uint8_t data[8]) {
-    // 尝试 float32 小端 (bytes 4..7)
-    union { float f; uint32_t u; } conv = {0};
-    conv.u = static_cast<uint32_t>(data[4]) |
-             (static_cast<uint32_t>(data[5]) << 8) |
-             (static_cast<uint32_t>(data[6]) << 16) |
-             (static_cast<uint32_t>(data[7]) << 24);
-    if (std::isfinite(conv.f) && std::fabs(conv.f) <= 180.0) {
-        return static_cast<double>(conv.f);
-    }
-
-    // 尝试 int16 小端缩放0.01 (bytes 4..5)
-    int16_t v_le = static_cast<int16_t>(static_cast<uint16_t>(data[4]) |
-                (static_cast<uint16_t>(data[5]) << 8));
-    double deg_le = static_cast<double>(v_le) * 0.01;
-    if (std::fabs(deg_le) <= 180.0) {
-        return deg_le;
-    }
-
-    // 尝试 int16 大端缩放0.01 (bytes 4..5)
-    int16_t v_be = static_cast<int16_t>(static_cast<uint16_t>(data[5]) |
-                (static_cast<uint16_t>(data[4]) << 8));
+static double parseXRollDegFromSenseFrame(const uint8_t data[8]) {
+    // 尝试 int16 小端缩放0.01 (bytes 0..1)
+    int16_t v_be = static_cast<int16_t>(static_cast<uint16_t>(data[1]) << 8 |
+                                        static_cast<uint16_t>(data[0]));
     double deg_be = static_cast<double>(v_be) * 0.01;
-    if (std::fabs(deg_be) <= 180.0) {
+    if (std::fabs(deg_be) <= 360.0) {
         return deg_be;
     }
-
     return 0.0;
 }
 
@@ -549,34 +526,41 @@ void ChanganCANParser::updateRelativeAnglesAndChassis() {
         double steering_percentage = (current_steer_angle_ / 50.0) * 100.0;
         chassisProtoMsg.set_steering_percentage(static_cast<float>(steering_percentage));
     }
+    // 通过标准输出打印角度（相对/绝对）
+    std::cout << "Angle Sensors: "
+              << "boom_rel_body_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.boom_rel_body_deg
+              << ", bucket_rel_boom_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.bucket_rel_boom_deg
+              << ", boom_pitch_y_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.boom_pitch_y_deg
+              << ", bucket_pitch_y_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.bucket_pitch_y_deg
+              << std::endl;
 }
 
-// 解析 0x00000581 车体倾角（Y_pitch）
+// 解析 0x00000581 车体倾角（X_roll）
 void ChanganCANParser::handle0x00000581(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
         std::lock_guard<std::mutex> lk(vehicleStatusMutex);
-        angle_sensors_.body_pitch_y_deg = parseYPitchDegFromSenseFrame(recvCanFrame->frame.data);
+        angle_sensors_.body_roll_x_deg = parseXRollDegFromSenseFrame(recvCanFrame->frame.data);
         updateRelativeAnglesAndChassis();
     }
 }
 
-// 解析 0x00000582 大臂倾角（Y_pitch）
+// 解析 0x00000582 大臂倾角（X_roll）
 void ChanganCANParser::handle0x00000582(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
         std::lock_guard<std::mutex> lk(vehicleStatusMutex);
-        angle_sensors_.boom_pitch_y_deg = parseYPitchDegFromSenseFrame(recvCanFrame->frame.data);
+        angle_sensors_.boom_roll_x_deg = parseXRollDegFromSenseFrame(recvCanFrame->frame.data);
         updateRelativeAnglesAndChassis();
     }
 }
 
-// 解析 0x00000583 铲斗倾角（Y_pitch）
+// 解析 0x00000583 铲斗倾角（X_roll）
 void ChanganCANParser::handle0x00000583(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
         std::lock_guard<std::mutex> lk(vehicleStatusMutex);
-        angle_sensors_.bucket_pitch_y_deg = parseYPitchDegFromSenseFrame(recvCanFrame->frame.data);
+        angle_sensors_.bucket_roll_x_deg = parseXRollDegFromSenseFrame(recvCanFrame->frame.data);
         updateRelativeAnglesAndChassis();
     }
 }

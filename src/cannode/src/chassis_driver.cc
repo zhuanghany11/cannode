@@ -115,8 +115,7 @@ void ChassisCan::StartRecv() {
     }
 
     ioctl(fd_can, SIOCGSTAMP_NEW, &oneframe.timestamp);
-
-    HandleRecvData(&oneframe);
+        HandleRecvData(&oneframe);
   }
 }
 
@@ -124,12 +123,21 @@ void ChassisCan::StartRecv() {
 void ChassisCan::HandleRecvData(struct Canframe *recvCanFrame) {
   //if(!CanA::Instance()->flag_can_adaptor_init_complete){return;}
   recvCanFrame->frame.can_id &= CAN_EFF_MASK;
+  std::cout << "recvCanFrame->frame.can_id: " << std::hex << recvCanFrame->frame.can_id << std::endl;
+
   callHandleWireCanCmdFunc(recvCanFrame);
 }
 
 // 根据 map 分发到具体 handler（含健壮性检查）
 void ChassisCan::callHandleWireCanCmdFunc(struct Canframe *recvCanFrame) {
   try {
+    // 调试输出：当前 can_id 以及 map 中所有已注册的 can_id
+    std::cout << "[dispatch] current can_id=0x" << std::hex << recvCanFrame->frame.can_id << std::dec << std::endl;
+    std::cout << "[dispatch] handleChassisCanFuncMap size=" << handleChassisCanFuncMap.size() << std::endl;
+    for (const auto &kv : handleChassisCanFuncMap) {
+      std::cout << "[dispatch] map key can_id=0x" << std::hex << kv.first << std::dec << std::endl;
+    }
+
     if((handleChassisCanFuncMap.find(recvCanFrame->frame.can_id) == handleChassisCanFuncMap.end())
       || std::isnan(recvCanFrame->frame.data[0]) || std::isnan(recvCanFrame->frame.data[1])
       || std::isnan(recvCanFrame->frame.data[2]) || std::isnan(recvCanFrame->frame.data[3])
@@ -143,7 +151,7 @@ void ChassisCan::callHandleWireCanCmdFunc(struct Canframe *recvCanFrame) {
       return;
     } else {
       (this->*handleChassisCanFuncMap[recvCanFrame->frame.can_id])(recvCanFrame);
-      //LOG_Channel_Info("can") << boost::format("0x%08x ") % recvCanFrame->frame.can_id << boost::log::dump(recvCanFrame->frame.data, 8);
+      std::cout << "recvCanFrame->frame.can_id: " << std::hex << recvCanFrame->frame.can_id << " data: " << std::hex << (uint32_t)recvCanFrame->frame.data[0] << " " << (uint32_t)recvCanFrame->frame.data[1] << " " << (uint32_t)recvCanFrame->frame.data[2] << " " << (uint32_t)recvCanFrame->frame.data[3] << " " << (uint32_t)recvCanFrame->frame.data[4] << " " << (uint32_t)recvCanFrame->frame.data[5] << " " << (uint32_t)recvCanFrame->frame.data[6] << " " << (uint32_t)recvCanFrame->frame.data[7] << std::endl;
     }
   } catch (std::exception &e) {
     //LOG_Channel_Error("canlog")<<"control : Proc function error!\n"<<e.what();
