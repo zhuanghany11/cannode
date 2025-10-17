@@ -30,9 +30,9 @@ enum ChanganCanProtoId {
 // 角度传感器与倾角仪 CAN 消息ID（参考 Read_angle_sensors/doc/Sense_DBC.dbc）
 // 注：以下ID为实际在总线使用的ID（若DBC给出ID需-0x80000000，则此处已为减法后的结果）
 enum ChanganAngleSensorId {
-    CA_IMU_BODY_PITCH   = 0x80000581,  // 车体倾角仪（使用X_roll）
-    CA_IMU_BOOM_PITCH   = 0x80000582,  // 大臂倾角仪（使用X_roll）
-    CA_IMU_BUCKET_PITCH = 0x80000583,  // 铲斗倾角仪（使用X_roll）
+    CA_IMU_BODY_PITCH   = 0x581,  // 车体倾角仪（使用X_roll）
+    CA_IMU_BOOM_PITCH   = 0x582,  // 大臂倾角仪（使用X_roll）
+    CA_IMU_BUCKET_PITCH = 0x583,  // 铲斗倾角仪（使用X_roll）
     CA_STEER_ENCODER    = 0x18FF0015   // 转向角度编码器（byte[1..2] / 100.0 -> 度）
 };
 

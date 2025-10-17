@@ -505,11 +505,11 @@ static double parseXRollDegFromSenseFrame(const uint8_t data[8]) {
 void ChanganCANParser::updateRelativeAnglesAndChassis() {
     // 计算相对角，加入零点标定
     angle_sensors_.boom_rel_body_deg =
-        (angle_sensors_.boom_pitch_y_deg - angle_sensors_.body_pitch_y_deg) +
+        (angle_sensors_.boom_roll_x_deg - angle_sensors_.body_roll_x_deg) +
         angle_sensors_.boom_zero_offset_deg;
 
     angle_sensors_.bucket_rel_boom_deg =
-        (angle_sensors_.bucket_pitch_y_deg - angle_sensors_.boom_pitch_y_deg) +
+        (angle_sensors_.bucket_roll_x_deg - angle_sensors_.boom_roll_x_deg) +
         angle_sensors_.bucket_zero_offset_deg;
 
     // 更新内部当前角度
@@ -530,9 +530,9 @@ void ChanganCANParser::updateRelativeAnglesAndChassis() {
     std::cout << "Angle Sensors: "
               << "boom_rel_body_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.boom_rel_body_deg
               << ", bucket_rel_boom_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.bucket_rel_boom_deg
-              << ", boom_pitch_y_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.boom_pitch_y_deg
-              << ", bucket_pitch_y_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.bucket_pitch_y_deg
-              << std::endl;
+              << ", boom_roll_x_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.boom_roll_x_deg
+              << ", bucket_roll_x_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.bucket_roll_x_deg
+              << ",steering_angle_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.steering_angle_deg << std::endl;
 }
 
 // 解析 0x00000581 车体倾角（X_roll）
@@ -575,6 +575,7 @@ void ChanganCANParser::handle0x18FF0015(struct Canframe *recvCanFrame) {
                                              recvCanFrame->frame.data[2]);
         double deg = static_cast<double>(raw) / 100.0;
         angle_sensors_.steering_angle_deg = deg;
+        std::cout << "steering_angle_deg: " << std::fixed << std::setprecision(2) << angle_sensors_.steering_angle_deg << std::endl;
         steer_encoder_available_ = true;
         updateRelativeAnglesAndChassis();
     }

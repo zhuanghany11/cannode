@@ -122,8 +122,9 @@ void ChassisCan::StartRecv() {
 // 处理接收帧：掩掉 EFF 标志并调用分发函数
 void ChassisCan::HandleRecvData(struct Canframe *recvCanFrame) {
   //if(!CanA::Instance()->flag_can_adaptor_init_complete){return;}
+  std::cout << "recvCanFrame->frame.can_id(before): " << std::hex << recvCanFrame->frame.can_id << std::endl;
   recvCanFrame->frame.can_id &= CAN_EFF_MASK;
-  std::cout << "recvCanFrame->frame.can_id: " << std::hex << recvCanFrame->frame.can_id << std::endl;
+  std::cout << "recvCanFrame->frame.can_id(after): " << std::hex << recvCanFrame->frame.can_id << std::endl;
 
   callHandleWireCanCmdFunc(recvCanFrame);
 }
