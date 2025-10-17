@@ -20,6 +20,7 @@ MsgManager::MsgManager(): Node("chassis_node") {
 
   // 创建底盘状态发布者
   chassis_status_pub = this->create_publisher<sa_msgs::msg::ProtoAdapter>("/SaVehicleReportV2", 10);
+  
   chassis_cmd_sub = this->create_subscription<sa_msgs::msg::ProtoAdapter>(
       "/vehicle_command", 10, std::bind(&MsgManager::procControlImplement, this, std::placeholders::_1));
 

@@ -50,6 +50,8 @@ void ChanganCANParser::initFuncMap() {
 void ChanganCANParser::initPIDControllers() {
     // 初始化速度控制器 (加速度到速度)
     // 参数可以从launch文件配置，这里使用默认值
+
+    // [LJS][YS] 关注一下参数调整。
     speed_controller_.init(
         1.5,    // kp: 比例增益
         0.2,    // ki: 积分增益
@@ -60,6 +62,7 @@ void ChanganCANParser::initPIDControllers() {
     );
     
     // 初始化大臂角度控制器 (阀开度到角度)
+    // [LJS][YS] 关注一下参数调整。
     arm_controller_.init(
         25.0,   // kp: 比例增益
         0.8,    // ki: 积分增益
@@ -71,6 +74,7 @@ void ChanganCANParser::initPIDControllers() {
     );
     
     // 初始化铲斗角度控制器 (阀开度到角度)
+    // [LJS][YS] 关注一下参数调整。
     bucket_controller_.init(
         25.0,   // kp: 比例增益
         0.8,    // ki: 积分增益
@@ -82,6 +86,8 @@ void ChanganCANParser::initPIDControllers() {
     );
     
     // 初始化转向角度控制器 (阀开度到角度)
+    // [ZTY] 实际上层controller发送的横向控制指令是“角速度”。
+    // 目前代码是目标铰接角度作为输入，但是实际上层控制器发的是目标铰接角速度。需要修改控制器。
     steer_controller_.init(
         30.0,   // kp: 比例增益
         1.0,    // ki: 积分增益
@@ -167,16 +173,17 @@ void ChanganCANParser::sendChassisControl() {
         // 软急停（可从control_cmd获取）
         chassisCtrl.soft_estop = ctl_cmd.estop() ? 1 : 0;
         
-        // 心跳信号（至少200ms翻转一次，即每20次调用翻转一次，20ms*20=400ms实际，这里简化为计数，每次都翻转。）
-        if (++heartbeat_counter_ >= 1) {  // 20ms * 10 = 200ms
+        // 心跳信号（至少200ms翻转一次，即每10次调用翻转一次，20ms*10=200ms实际，这里简化为计数，每次都翻转。）
+        if (++heartbeat_counter_ >= 10) {  // 20ms * 10 = 200ms
             heartbeat_counter_ = 0;
             chassisCtrl.heartbeat = !chassisCtrl.heartbeat;
         } else {
             chassisCtrl.heartbeat = (heartbeat_counter_ < 5) ? 0 : 1;
         }
         
-        // 整车模式 (0=有人, 1=无人)
-        chassisCtrl.vehicle_mode = 1;  // 默认无人模式
+        // 整车模式 
+        // 1翻转当前状态，所以发送0，由车辆按钮进入无人模式。
+        chassisCtrl.vehicle_mode = 0; 
         
         // 工作灯等其他控制可以根据需要添加
     }
@@ -184,6 +191,7 @@ void ChanganCANParser::sendChassisControl() {
     memcpy(canFrame.data, &chassisCtrl, sizeof(CA_ChassisCtrl));
     SendCanFrame(canFrame);
 }
+
 
 // 发送 0x18000002 液压/转向控制（转向阀 PID 输出电流与方向）
 // 调用处：SendCmdFunc()
@@ -213,14 +221,16 @@ void ChanganCANParser::sendHydraulicControl(double dt) {
         // 液压电机扭矩 (范围-3000~3000, 有3000的offset, 默认物理值为0Nm, CAN发送3000)
         hydraulicCtrl.hyd_req_torque = 3000;  // 零值，物理值0Nm
         
+
         // 转向控制 - 使用转向角度控制器
-        // steering_target 是百分比 [-100, 100]，需要转换为角度 (假设±50度)
-        double target_steer_percentage = ctl_cmd.steering_target();
-        double target_steer_angle = target_steer_percentage * 0.5;  // 转换为角度 (-50~50度)
+        // [ZTY] 实际上层controller发送的横向控制指令是“角速度”。
+        // [YS] 之前的协议给的steering_target 是百分比 [-100, 100]，但并不起作用。所以后面测试的时候首先变成角度。
+        double target_steer_angle = ctl_cmd.steering_target();  // [YS] 直接给定恒定角度进行测试。
         // dt 由 SendCmdFunc 实时计算传入
         
         // 计算转向阀电流 (通过PID控制器)
         double steer_valve_current = steer_controller_.compute(target_steer_angle, current_steer_angle_, dt);
+
         // 取绝对值并限幅到 [0, 500] (上限是1500 mA）
         double steer_valve_current_abs = std::fabs(steer_valve_current);
         if (steer_valve_current_abs > 500.0) steer_valve_current_abs = 500.0;
@@ -237,6 +247,11 @@ void ChanganCANParser::sendHydraulicControl(double dt) {
         
         // 设置转向阀电流（幅值）
         hydraulicCtrl.steer_valve_current = static_cast<uint16_t>(steer_valve_current_abs);
+
+
+        // [YS] 直接设定steer_valve_dir和steer_valve_current进行测试。
+        // hydraulicCtrl.steer_valve_current = 5;
+        // hydraulicCtrl.steer_valve_dir = 1;
     }
     
     memcpy(canFrame.data, &hydraulicCtrl, sizeof(CA_HydraulicCtrl));
@@ -269,6 +284,7 @@ void ChanganCANParser::sendWalkingControl(double dt) {
         // dt 由 SendCmdFunc 实时计算传入
         
         // 使用速度控制器计算所需加速度
+        // [YS][LJS] 实际测试速度控制器，调整参数。
         double acceleration = speed_controller_.compute(target_speed, current_speed_, dt);
         
         // 根据加速度计算扭矩（简化模型：扭矩正比于加速度）
@@ -278,10 +294,11 @@ void ChanganCANParser::sendWalkingControl(double dt) {
         // 数据下发增加一个3000的offset
         walkingCtrl.drive_req_torque = static_cast<uint16_t>(torque_cmd+3000);
         
-        // 设置行走电机转速（范围-15000~15000），无作用，加速度由扭矩控制。
+        // 设置行走电机转速（范围-15000~15000）,有15000的offset，无作用，加速度由扭矩控制。
         walkingCtrl.drive_req_speed = static_cast<uint16_t>(15000);
         
         // 确定行走方向
+        // [YS][LJS] 进行档位测试。
         if (target_speed > 0.1) {
             walkingCtrl.drive_direction = 1;  // 前进
         } else if (target_speed < -0.1) {
@@ -291,12 +308,19 @@ void ChanganCANParser::sendWalkingControl(double dt) {
         }
         
         // 刹车控制（如果有驻车制动请求）
-        // TODO： 目前没有通过制动进行车辆控制的功能。
+        // [YS][LJS] 通过给定刹车电流进行测试。
         if (ctl_cmd.parking_brake()) {
             walkingCtrl.brake_valve_current = 1200;  // 刹车电流 (400-1600mA)
         } else {
             walkingCtrl.brake_valve_current = 400;   // 最小刹车电流
         }
+
+
+        // [YS][LJS] 直接设定drive_direction和drive_req_torque进行测试。
+        // walkingCtrl.drive_direction = 1;
+        // walkingCtrl.drive_req_torque = 200;
+        // walkingCtrl.drive_direction = 2;
+        // walkingCtrl.drive_req_torque = 100;
     }
     
     memcpy(canFrame.data, &walkingCtrl, sizeof(CA_WalkingCtrl));
@@ -318,6 +342,7 @@ void ChanganCANParser::sendActuatorControl(double dt) {
         // dt 由 SendCmdFunc 实时计算传入
         
         // 大臂控制 - 使用角度控制器
+        // [YS][LJS] 通过给定恒定的角度进行测试。
         double target_arm_angle = ctl_cmd.arm_angle();  // 从control_cmd获取目标大臂角度
         double arm_valve_current = arm_controller_.compute(target_arm_angle, current_arm_angle_, dt);
         double arm_valve_current_abs = std::fabs(arm_valve_current);
@@ -337,6 +362,7 @@ void ChanganCANParser::sendActuatorControl(double dt) {
         }
         
         // 铲斗控制 - 使用角度控制器
+        // [YS][LJS] 通过给定恒定的角度进行测试。
         double target_bucket_angle = ctl_cmd.shovel_angle();  // 从control_cmd获取目标铲斗角度
         double bucket_valve_current = bucket_controller_.compute(target_bucket_angle, current_bucket_angle_, dt);
         double bucket_valve_current_abs = std::fabs(bucket_valve_current);
@@ -354,6 +380,19 @@ void ChanganCANParser::sendActuatorControl(double dt) {
             actuatorCtrl.bucket_out_current = 0;
             actuatorCtrl.bucket_in_current = 0;
         }
+
+
+        // [YS][LJS] 直接设定bucket_out_current和bucket_in_current进行测试。
+        // actuatorCtrl.bucket_out_current = 300;
+        // actuatorCtrl.bucket_in_current = 0;
+        // actuatorCtrl.bucket_out_current = 0;
+        // actuatorCtrl.bucket_in_current = 300;
+
+        // [YS][LJS] 直接设定arm_up_current和arm_down_current进行测试。
+        // actuatorCtrl.arm_up_current = 300;
+        // actuatorCtrl.arm_down_current = 0;
+        // actuatorCtrl.arm_up_current = 0;
+        // actuatorCtrl.arm_down_current = 300;
     }
     
     memcpy(canFrame.data, &actuatorCtrl, sizeof(CA_ActuatorCtrl));
@@ -502,6 +541,7 @@ static double parseXRollDegFromSenseFrame(const uint8_t data[8]) {
 }
 
 // 依据原始倾角/编码器值，计算相对角并写入底盘状态
+// [YS][LJS] 等北航装完新的线束之后，测试角度解析是否正确，以及设定零点offset。
 void ChanganCANParser::updateRelativeAnglesAndChassis() {
     // 计算相对角，加入零点标定
     angle_sensors_.boom_rel_body_deg =
@@ -532,10 +572,15 @@ void ChanganCANParser::updateRelativeAnglesAndChassis() {
               << ", bucket_rel_boom_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.bucket_rel_boom_deg
               << ", boom_roll_x_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.boom_roll_x_deg
               << ", bucket_roll_x_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.bucket_roll_x_deg
-              << ",steering_angle_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.steering_angle_deg << std::endl;
+              << ",steering_angle_deg=" << std::fixed << std::setprecision(2) << angle_sensors_.steering_angle_deg << 
+              ", current_arm_angle_=" << std::fixed << std::setprecision(2) << current_arm_angle_ << 
+              ", current_bucket_angle_=" << std::fixed << std::setprecision(2) << current_bucket_angle_ << 
+              ", current_steer_angle_=" << std::fixed << std::setprecision(2) << current_steer_angle_ << 
+              std::endl;
 }
 
 // 解析 0x00000581 车体倾角（X_roll）
+// [YS][LJS] 等北航装完新的线束之后，测试角度解析是否正确，以及设定零点offset。
 void ChanganCANParser::handle0x00000581(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
@@ -546,6 +591,7 @@ void ChanganCANParser::handle0x00000581(struct Canframe *recvCanFrame) {
 }
 
 // 解析 0x00000582 大臂倾角（X_roll）
+// [YS][LJS] 等北航装完新的线束之后，测试角度解析是否正确，以及设定零点offset。
 void ChanganCANParser::handle0x00000582(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {
@@ -556,6 +602,7 @@ void ChanganCANParser::handle0x00000582(struct Canframe *recvCanFrame) {
 }
 
 // 解析 0x00000583 铲斗倾角（X_roll）
+// [YS][LJS] 等北航装完新的线束之后，测试角度解析是否正确，以及设定零点offset。
 void ChanganCANParser::handle0x00000583(struct Canframe *recvCanFrame) {
     if (recvCanFrame->frame.can_dlc != 8) { return; }
     {

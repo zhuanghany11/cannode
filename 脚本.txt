@@ -1,8 +1,21 @@
 # frp进去
+# 自己电脑连着4G或者公网，通过SSH/FRP去链接域控
 ssh -p 47102 nvidia@test.zhipeng.zone
+# 密码 nvidia
 
-# 发送文件
+# 车内代码主文件
+# [ZHY]车上域控，配置SSH到我们的github，同步代码
+/home/nvidia/zhy/cannode-main
+
+# 发送文件（不用）
 scp -P 47102 -r src nvidia@test.zhipeng.zone:/home/nvidia/zhy/cannode-main/
 
-# 发送文件src
+# 发送文件src（精简）
 scp -P 47102 -r src/cannode/src nvidia@test.zhipeng.zone:/home/nvidia/zhy/cannode-main/src/cannode
+
+
+# 车内代码结构中sa_msgs支持环境完善
+build/
+install/sa_msgs
+log/
+src/ #缺少sa_msgs的包，直接使用了*.tar放到install。  首先colcon build，生成文件并报错。然后sa_msgs.tar.orin解压后放到install里面就行。然后source install/setup.bash。
