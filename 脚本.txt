@@ -1,0 +1,8 @@
+# frp进去
+ssh -p 47102 nvidia@test.zhipeng.zone
+
+# 发送文件
+scp -P 47102 -r cannode-main nvidia@test.zhipeng.zone:/home/nvidia/zhy/
+
+# 发送文件src
+scp -P 47102 -r cannode-main/src/cannode/src nvidia@test.zhipeng.zone:/home/nvidia/zhy/cannode-main/src/cannode
